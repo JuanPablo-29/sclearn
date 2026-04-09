@@ -1,36 +1,110 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sclearn
 
-## Getting Started
+Mobile-first flashcards: sign in, paste notes, generate a deck (mock or OpenAI via a **secure Edge Function**), and learn with TikTok-style scrolling. Decks are stored in **Supabase** per user.
 
-First, run the development server:
+Stack: **Vite**, **React**, **TypeScript**, **Tailwind CSS**, **Supabase** (Auth + Postgres + Edge Functions).
+
+## Frontend setup
+
+```bash
+npm install
+cp .env.example .env
+```
+
+Fill in `.env`:
+
+- `VITE_SUPABASE_URL` — Project URL (Settings → API)
+- `VITE_SUPABASE_PUBLISHABLE_KEY` — **Publishable** key (`sb_publishable_…`, safe for the browser)
+
+**Do not** put `OPENAI_API_KEY` in Vite env vars; it must only exist on the server (Edge Function secret).
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:5173](http://localhost:5173).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Supabase: database and auth
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Create a project at [supabase.com](https://supabase.com).
+2. **Authentication → Providers**: enable **Email**.
+3. **SQL Editor**: run the migration in `supabase/migrations/20250331000000_initial_schema.sql` (or use CLI: `supabase db push`).
 
-## Learn More
+This creates `profiles` (auto-filled on signup via trigger), `flashcards`, and **RLS** so users only access their own rows.
 
-To learn more about Next.js, take a look at the following resources:
+Run `supabase/migrations/20250331100000_usage_logs.sql` as well (or `supabase db push`): it adds **`usage_logs`** and RPCs used to enforce a **per-user daily AI generation limit** (UTC) in the Edge Function before OpenAI is called.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Supabase Edge Function (OpenAI)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The function `generate-flashcards`:
 
-## Deploy on Vercel
+- **Does not** rely on gateway JWT verification (`verify_jwt = false` in `supabase/config.toml`; turn **Verify JWT** off for this function in the dashboard if it overrides deploy).
+- Reads **`Authorization: Bearer <access_token>`** and validates the user with **`supabase.auth.getUser()`** inside the function.
+- Calls OpenAI with **`OPENAI_API_KEY`** from Edge secrets (never exposed to the client).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Deploy (Supabase CLI)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+# one-time: https://supabase.com/docs/guides/cli
+supabase login
+supabase link --project-ref YOUR_PROJECT_REF
+
+supabase secrets set OPENAI_API_KEY=sk-...
+
+supabase functions deploy generate-flashcards
+```
+
+Hosted functions inject **`SUPABASE_URL`** and typically **`SUPABASE_ANON_KEY`** (still usable as the public client key during migration). To align with the publishable key model, you can set:
+
+```bash
+supabase secrets set SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+```
+
+The function uses **`SUPABASE_PUBLISHABLE_KEY` if set**, otherwise **`SUPABASE_ANON_KEY`**, for the Auth client used with `getUser`.
+
+For local testing:
+
+```bash
+supabase start
+supabase secrets set OPENAI_API_KEY=sk-... --env-file supabase/.env.local
+supabase functions serve generate-flashcards
+```
+
+Point `VITE_SUPABASE_URL` at local stack if needed ([local development docs](https://supabase.com/docs/guides/functions/local-development)).
+
+### Client requests
+
+The app calls the function with **`fetch`**, sending:
+
+- **`apikey`**: same value as `VITE_SUPABASE_PUBLISHABLE_KEY`
+- **`Authorization`**: `Bearer <user access_token>` when the user is signed in (required for AI generation)
+
+## Scripts
+
+- `npm run dev` — Vite dev server
+- `npm run build` — Typecheck + production build → `dist/`
+- `npm run preview` — Preview production build
+- `npm run lint` — ESLint
+
+## Routes
+
+- `/` — Marketing landing page
+- `/app` — Input + generate (requires sign-in)
+- `/learn` — Load saved flashcards from Supabase + scroll
+- `/login`, `/register` — Email/password auth
+- `/privacy`, `/terms` — Placeholder legal pages (footer links)
+
+## Troubleshooting: Edge Function `401`
+
+1. **Signed in** — AI generation requires a session. Sign out and sign in again.
+2. **Email confirmation** — If Auth requires confirmed email, unconfirmed users may not get a usable token.
+3. **Same project** — `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` must match the project where the function is deployed and where the user signed up.
+4. **Headers** — Requests must include **`apikey`** (publishable) and **`Authorization: Bearer <access_token>`**. See `src/lib/generateFlashcardsApi.ts`.
+5. **Dashboard** — For `generate-flashcards`, **Verify JWT** should be **off** so the gateway does not reject tokens before your function runs; auth is enforced inside the function.
+6. **Redeploy** — After changing secrets or function config: `supabase functions deploy generate-flashcards`.
+
+## Security notes
+
+- **Secret / service role** keys must never ship in the frontend; the app only uses the **publishable** key client-side.
+- OpenAI calls happen **only** inside the Edge Function.
+- For production, consider tightening CORS on the Edge Function and rate limiting.

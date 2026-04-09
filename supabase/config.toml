@@ -1,0 +1,5 @@
+# https://supabase.com/docs/guides/cli/config
+# JWT verification is done inside the function (Authorization + getUser), not at the gateway.
+
+[functions.generate-flashcards]
+verify_jwt = false

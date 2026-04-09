@@ -1,0 +1,27 @@
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { AuthProvider } from "@/context/AuthContext";
+import Home from "@/pages/Home";
+import Landing from "@/pages/Landing";
+import Learn from "@/pages/Learn";
+import Login from "@/pages/Login";
+import Privacy from "@/pages/Privacy";
+import Register from "@/pages/Register";
+import Terms from "@/pages/Terms";
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/app" element={<Home />} />
+          <Route path="/learn" element={<Learn />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}
