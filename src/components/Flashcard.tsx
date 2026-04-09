@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { trackEvent } from "@/lib/analytics";
 
 type FlashcardProps = {
   question: string;
@@ -12,7 +13,10 @@ export function Flashcard({ question, answer }: FlashcardProps) {
   return (
     <button
       type="button"
-      onClick={() => setFlipped((f) => !f)}
+      onClick={() => {
+        trackEvent("flashcard_flipped");
+        setFlipped((f) => !f);
+      }}
       className="flex h-[min(70dvh,560px)] min-h-[44px] w-[min(92vw,480px)] cursor-pointer touch-manipulation flex-col items-center justify-center gap-3 rounded-2xl border border-zinc-700 bg-zinc-900 px-6 py-8 text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 sm:px-8"
       aria-label={flipped ? "Show question" : "Show answer"}
     >

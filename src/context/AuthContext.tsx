@@ -4,9 +4,11 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
+import { identifyUser, resetAnalytics } from "@/lib/analytics";
 import { supabase } from "@/lib/supabase";
 
 type AuthContextValue = {
@@ -23,6 +25,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const prevUserIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
@@ -38,6 +41,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    const u = session?.user;
+    if (u?.id) {
+      identifyUser({ id: u.id, email: u.email ?? undefined });
+      prevUserIdRef.current = u.id;
+    } else if (prevUserIdRef.current) {
+      resetAnalytics();
+      prevUserIdRef.current = undefined;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- identify only when user id/email change
+  }, [loading, session?.user?.id, session?.user?.email]);
 
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password });

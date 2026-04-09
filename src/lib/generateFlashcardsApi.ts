@@ -1,3 +1,4 @@
+import { trackEvent } from "@/lib/analytics";
 import type { Flashcard } from "./flashcard";
 import { supabase } from "./supabase";
 
@@ -167,6 +168,7 @@ export async function generateFlashcardsFromNotes(
 
   if (!response.ok) {
     if (response.status === 429) {
+      trackEvent("daily_limit_reached");
       throw new Error(
         "You have reached today's free generation limit. Please try again tomorrow."
       );

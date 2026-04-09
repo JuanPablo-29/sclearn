@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Scroller } from "@/components/Scroller";
 import { useAuth } from "@/context/AuthContext";
+import { trackEvent } from "@/lib/analytics";
 import { fetchUserFlashcards } from "@/lib/flashcardsDb";
 import type { Flashcard } from "@/lib/flashcard";
 import { supabase } from "@/lib/supabase";
@@ -11,6 +12,14 @@ export default function Learn() {
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const studySessionTracked = useRef(false);
+
+  useEffect(() => {
+    if (authLoading || loading || !user || error || cards.length === 0) return;
+    if (studySessionTracked.current) return;
+    studySessionTracked.current = true;
+    trackEvent("study_session_started", { card_count: cards.length });
+  }, [authLoading, loading, user, error, cards.length]);
 
   useEffect(() => {
     if (authLoading) return;

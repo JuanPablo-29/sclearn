@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { trackEvent } from "@/lib/analytics";
 import { replaceUserFlashcards } from "@/lib/flashcardsDb";
 import { generateFlashcardsFromNotes } from "@/lib/generateFlashcardsApi";
 import { generateMockFlashcards } from "@/lib/mockFlashcards";
@@ -35,6 +36,10 @@ export default function Home() {
         }
       }
       await replaceUserFlashcards(supabase, user.id, cards);
+      trackEvent("flashcards_generated", {
+        mode: useAi ? "ai" : "mock",
+        card_count: cards.length,
+      });
       navigate("/learn");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");

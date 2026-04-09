@@ -15,6 +15,9 @@ Fill in `.env`:
 
 - `VITE_SUPABASE_URL` — Project URL (Settings → API)
 - `VITE_SUPABASE_PUBLISHABLE_KEY` — **Publishable** key (`sb_publishable_…`, safe for the browser)
+- `VITE_POSTHOG_KEY` — (Optional) PostHog project API key for product analytics; omit to disable client analytics
+
+On **Railway** (or any host), set the same `VITE_*` variables in the deployment environment so they are baked in at build time.
 
 **Do not** put `OPENAI_API_KEY` in Vite env vars; it must only exist on the server (Edge Function secret).
 
@@ -92,7 +95,7 @@ The app calls the function with **`fetch`**, sending:
 - `/app` — Input + generate (requires sign-in)
 - `/learn` — Load saved flashcards from Supabase + scroll
 - `/login`, `/register` — Email/password auth
-- `/privacy`, `/terms` — Placeholder legal pages (footer links)
+- `/privacy`, `/terms` — Privacy Policy and Terms of Service (footer links)
 
 ## Troubleshooting: Edge Function `401`
 
