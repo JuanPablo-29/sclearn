@@ -12,31 +12,39 @@ export function Hero({ onAppCtaClick }: HeroProps) {
         aria-hidden
       />
       <div className="relative mx-auto max-w-6xl px-6">
+        <div className="mb-8 flex justify-center">
+          <img
+            src="/logo.png"
+            alt="Sclearn logo"
+            width={112}
+            height={112}
+            className="h-24 w-24 object-contain sm:h-28 sm:w-28"
+            decoding="async"
+          />
+        </div>
+
         <div className="mx-auto max-w-3xl text-center">
-          <div className="mb-6 flex justify-center">
-            <img
-              src="/logo.png"
-              alt="Sclearn logo"
-              width={112}
-              height={112}
-              className="h-24 w-24 object-contain sm:h-28 sm:w-28"
-              decoding="async"
-            />
+          <div className="space-y-6">
+            <p className="font-medium text-emerald-400">
+              Scroll + Learn = Sclearn
+            </p>
+            <h1 className="text-balance text-4xl font-bold tracking-tight text-zinc-100 sm:text-5xl md:text-6xl">
+              Turn Your Notes Into Addictive Study Scrolls
+            </h1>
+            <p className="mx-auto max-w-xl text-pretty text-base text-zinc-400 sm:text-lg">
+              Sclearn combines scrolling and learning. Generate flashcards from
+              your notes and study them with an addictive swipe-based interface
+              designed to keep you engaged.
+            </p>
           </div>
-          <h1 className="text-balance text-3xl font-bold tracking-tight text-zinc-100 sm:text-4xl md:text-5xl lg:text-6xl">
-            Turn Your Notes Into AI Flashcards Instantly
-          </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-pretty text-base text-zinc-400 sm:text-lg">
-            Paste your notes and Sclearn generates flashcards you can study with
-            an addictive scrolling interface.
-          </p>
+
           <div className="mt-10 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center sm:justify-center">
             <Link
               to="/app"
               onClick={onAppCtaClick}
-              className="inline-flex min-h-[44px] touch-manipulation items-center justify-center rounded-xl bg-emerald-500 px-6 py-3 text-center text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400"
+              className="inline-flex min-h-[48px] touch-manipulation items-center justify-center rounded-xl bg-emerald-500 px-8 py-3.5 text-center text-base font-semibold text-zinc-950 shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-400 sm:min-h-[44px]"
             >
-              Start Studying Free
+              Start Scrolling to Learn
             </Link>
             <Link
               to="/login"

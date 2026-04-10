@@ -1,15 +1,15 @@
 const items = [
   {
     title: "AI Flashcard Generation",
-    body: "Turn raw notes into structured flashcards instantly.",
+    body: "Paste your notes and instantly generate flashcards powered by AI.",
   },
   {
-    title: "Scroll-Based Studying",
-    body: "Study with a TikTok-style interface designed to keep you engaged.",
+    title: "Addictive Scroll Learning",
+    body: "Study using a swipe-based interface inspired by social media feeds.",
   },
   {
-    title: "Mobile Friendly",
-    body: "Designed to work perfectly on phones so you can study anywhere.",
+    title: "Learn Faster",
+    body: "Scrolling through bite-sized questions helps you stay focused and retain more information.",
   },
 ];
 

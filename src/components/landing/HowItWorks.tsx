@@ -1,7 +1,22 @@
 const steps = [
-  { n: 1, title: "Paste your notes" },
-  { n: 2, title: "Generate flashcards with AI" },
-  { n: 3, title: "Scroll and study" },
+  {
+    n: 1,
+    title: "Paste your notes",
+    description:
+      "Add your lecture notes, readings, or any text — Sclearn uses it as the source for your deck.",
+  },
+  {
+    n: 2,
+    title: "Generate flashcards with AI",
+    description:
+      "AI turns your content into clear questions and answers you can study right away.",
+  },
+  {
+    n: 3,
+    title: "Scroll and learn",
+    description:
+      "Swipe through flashcards and tap to reveal answers, making studying feel natural and engaging.",
+  },
 ];
 
 export function HowItWorks() {
@@ -22,6 +37,9 @@ export function HowItWorks() {
               </span>
               <p className="mt-4 text-base font-medium text-zinc-100 sm:text-lg">
                 {step.title}
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+                {step.description}
               </p>
             </div>
           ))}
