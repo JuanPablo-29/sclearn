@@ -4,14 +4,12 @@ import { useAuth } from "@/context/AuthContext";
 import { trackEvent } from "@/lib/analytics";
 import { replaceUserFlashcards } from "@/lib/flashcardsDb";
 import { generateFlashcardsFromNotes } from "@/lib/generateFlashcardsApi";
-import { generateMockFlashcards } from "@/lib/mockFlashcards";
 import { supabase } from "@/lib/supabase";
 
 export default function Home() {
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
   const [notes, setNotes] = useState("");
-  const [useAi, setUseAi] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,27 +20,17 @@ export default function Home() {
     setError(null);
     setLoading(true);
     try {
-      let cards;
-      if (!useAi) {
-        cards = generateMockFlashcards(trimmed);
-        if (cards.length === 0) {
-          setError("Could not build flashcards from that input.");
-          return;
-        }
-      } else {
-        cards = await generateFlashcardsFromNotes(trimmed);
-        if (cards.length === 0) {
-          throw new Error("No flashcards returned");
-        }
+      const cards = await generateFlashcardsFromNotes(trimmed);
+      if (cards.length === 0) {
+        throw new Error("No flashcards returned");
       }
       await replaceUserFlashcards(supabase, user.id, cards);
-      trackEvent("flashcards_generated", {
-        mode: useAi ? "ai" : "mock",
-        card_count: cards.length,
-      });
+      trackEvent("flashcards_generated", { card_count: cards.length });
       navigate("/learn");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(
+        e instanceof Error ? e.message : "Failed to generate flashcards"
+      );
     } finally {
       setLoading(false);
     }
@@ -166,37 +154,7 @@ export default function Home() {
 
       <footer className="mt-auto w-full shrink-0 border-t border-zinc-800 bg-zinc-950">
         <div className="mx-auto w-full max-w-2xl px-4 py-3 pb-safe sm:px-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                role="switch"
-                aria-checked={useAi}
-                aria-label={useAi ? "AI on" : "AI off"}
-                disabled={!user || authLoading}
-                onClick={() => setUseAi((v) => !v)}
-                className="flex min-h-[44px] min-w-[44px] shrink-0 touch-manipulation items-center justify-center rounded-lg px-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:opacity-40"
-              >
-                <span
-                  className={`relative inline-flex h-9 w-14 shrink-0 items-center rounded-full ${
-                    useAi ? "bg-emerald-600" : "bg-zinc-700"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-1 size-7 rounded-full bg-white shadow ${
-                      useAi ? "right-1 left-auto" : "left-1 right-auto"
-                    }`}
-                  />
-                </span>
-              </button>
-              <span className="text-sm text-zinc-400">
-                Use AI{" "}
-                <span className="text-zinc-500">
-                  ({useAi ? "OpenAI (server)" : "mock deck, no API"})
-                </span>
-              </span>
-            </div>
-
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
             <button
               type="button"
               disabled={!canGenerate}
@@ -212,7 +170,7 @@ export default function Home() {
                   Generating…
                 </>
               ) : (
-                "Generate flashcards"
+                "Generate Flashcards"
               )}
             </button>
           </div>
