@@ -36,7 +36,7 @@ export function Scroller({ cards }: ScrollerProps) {
   return (
     <div
       ref={containerRef}
-      className="h-[100dvh] snap-y snap-mandatory overflow-y-auto scroll-smooth scroll-pt-14 overscroll-y-contain touch-pan-y"
+      className="h-[100dvh] snap-y snap-mandatory overflow-y-auto scroll-smooth overscroll-y-contain scroll-pt-0 touch-pan-y"
     >
       <header className="sticky top-0 flex shrink-0 items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-950 px-4 py-2">
         <Link
@@ -58,7 +58,7 @@ export function Scroller({ cards }: ScrollerProps) {
           key={`${index}-${card.question.slice(0, 24)}`}
           data-snap-slide
           data-index={index}
-          className="flex h-[100dvh] min-h-[100dvh] shrink-0 snap-start snap-always items-center justify-center px-4 py-6"
+          className="flex h-[100dvh] shrink-0 snap-start items-center justify-center px-4 py-6"
         >
           <Flashcard question={card.question} answer={card.answer} />
         </section>

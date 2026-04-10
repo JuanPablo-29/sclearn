@@ -4,8 +4,13 @@ import { Features } from "@/components/landing/Features";
 import { Footer } from "@/components/landing/Footer";
 import { Hero } from "@/components/landing/Hero";
 import { HowItWorks } from "@/components/landing/HowItWorks";
+import { trackEvent } from "@/lib/analytics";
 
 export default function Landing() {
+  const handleStartClick = () => {
+    trackEvent("landing_cta_clicked");
+  };
+
   return (
     <div className="min-h-[100dvh] bg-zinc-950 text-zinc-100">
       <header className="sticky top-0 z-10 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-md">
@@ -25,6 +30,7 @@ export default function Landing() {
             </Link>
             <Link
               to="/app"
+              onClick={handleStartClick}
               className="inline-flex min-h-[44px] touch-manipulation items-center rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-emerald-400"
             >
               Open app
@@ -34,10 +40,10 @@ export default function Landing() {
       </header>
 
       <main>
-        <Hero />
+        <Hero onAppCtaClick={handleStartClick} />
         <Features />
         <HowItWorks />
-        <CTA />
+        <CTA onAppCtaClick={handleStartClick} />
       </main>
 
       <Footer />

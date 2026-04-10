@@ -1,6 +1,10 @@
 import { Link } from "react-router-dom";
 
-export function Hero() {
+type HeroProps = {
+  onAppCtaClick?: () => void;
+};
+
+export function Hero({ onAppCtaClick }: HeroProps) {
   return (
     <section className="relative overflow-hidden border-b border-zinc-800/80 py-16 sm:py-24">
       <div
@@ -19,6 +23,7 @@ export function Hero() {
           <div className="mt-10 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center sm:justify-center">
             <Link
               to="/app"
+              onClick={onAppCtaClick}
               className="inline-flex min-h-[44px] touch-manipulation items-center justify-center rounded-xl bg-emerald-500 px-6 py-3 text-center text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400"
             >
               Start Studying Free

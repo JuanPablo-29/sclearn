@@ -1,6 +1,10 @@
 import { Link } from "react-router-dom";
 
-export function CTA() {
+type CTAProps = {
+  onAppCtaClick?: () => void;
+};
+
+export function CTA({ onAppCtaClick }: CTAProps) {
   return (
     <section className="py-16 sm:py-24">
       <div className="mx-auto max-w-6xl px-6">
@@ -13,6 +17,7 @@ export function CTA() {
           </p>
           <Link
             to="/app"
+            onClick={onAppCtaClick}
             className="mt-8 inline-flex min-h-[44px] touch-manipulation items-center justify-center rounded-xl bg-emerald-500 px-6 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400"
           >
             Generate Flashcards Now

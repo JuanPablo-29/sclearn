@@ -9,10 +9,12 @@
 
 html {
   min-height: 100dvh;
+  scroll-behavior: smooth;
 }
 
 body {
   min-height: 100dvh;
+  scroll-behavior: smooth;
   overflow-x: clip;
   background: var(--background);
   color: var(--foreground);
