@@ -9,12 +9,10 @@
 
 html {
   min-height: 100dvh;
-  scroll-behavior: smooth;
 }
 
 body {
   min-height: 100dvh;
-  scroll-behavior: smooth;
   overflow-x: clip;
   background: var(--background);
   color: var(--foreground);
@@ -28,4 +26,21 @@ a {
 
 .pb-safe {
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+
+/* Learn view: mandatory snap; WebKit obeys scroll-snap-stop on items, not only the container */
+.scroller {
+  scroll-snap-type: y mandatory;
+  scroll-behavior: auto;
+  /* touch: WebKit needs this for overflow scroll; final pixel is corrected in JS on scroll end */
+  -webkit-overflow-scrolling: touch;
+}
+
+.scroller > * {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  box-sizing: border-box;
+  /* explicit px from ResizeObserver — % height is unreliable for snap on iOS */
+  min-height: var(--scroller-slide-px, 100%);
+  height: var(--scroller-slide-px, 100%);
 }

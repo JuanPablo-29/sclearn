@@ -13,6 +13,16 @@ export function Hero({ onAppCtaClick }: HeroProps) {
       />
       <div className="relative mx-auto max-w-6xl px-6">
         <div className="mx-auto max-w-3xl text-center">
+          <div className="mb-6 flex justify-center">
+            <img
+              src="/logo.png"
+              alt="Sclearn logo"
+              width={112}
+              height={112}
+              className="h-24 w-24 object-contain sm:h-28 sm:w-28"
+              decoding="async"
+            />
+          </div>
           <h1 className="text-balance text-3xl font-bold tracking-tight text-zinc-100 sm:text-4xl md:text-5xl lg:text-6xl">
             Turn Your Notes Into AI Flashcards Instantly
           </h1>

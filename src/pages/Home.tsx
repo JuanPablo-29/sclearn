@@ -58,13 +58,23 @@ export default function Home() {
           <div>
             <Link
               to="/"
-              className="block text-base font-semibold tracking-tight text-zinc-100 hover:text-emerald-400/90 sm:text-lg"
+              className="inline-flex min-h-[44px] touch-manipulation items-center gap-2.5 text-base font-semibold tracking-tight text-zinc-100 hover:text-emerald-400/90 sm:text-lg"
             >
-              Sclearn
+              <img
+                src="/logo.png"
+                alt=""
+                width={48}
+                height={48}
+                className="h-12 w-12 shrink-0 object-contain sm:h-14 sm:w-14"
+                decoding="async"
+              />
+              <span className="flex flex-col items-start gap-0.5">
+                <span>Sclearn</span>
+                <span className="text-xs font-normal text-zinc-500 sm:text-sm">
+                  Scroll. Flip. Learn.
+                </span>
+              </span>
             </Link>
-            <p className="text-xs text-zinc-500 sm:text-sm">
-              Scroll. Flip. Learn.
-            </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {user ? (

@@ -17,9 +17,17 @@ export default function Landing() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link
             to="/"
-            className="text-lg font-semibold tracking-tight text-zinc-100"
+            className="inline-flex min-h-[44px] touch-manipulation items-center gap-3 text-lg font-semibold tracking-tight text-zinc-100"
           >
-            Sclearn
+            <img
+              src="/logo.png"
+              alt=""
+              width={48}
+              height={48}
+              className="h-12 w-12 shrink-0 object-contain sm:h-14 sm:w-14"
+              decoding="async"
+            />
+            <span>Sclearn</span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
