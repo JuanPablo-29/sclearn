@@ -13,12 +13,26 @@ type ScrollerProps = {
  */
 export function Scroller({ cards }: ScrollerProps) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [loopedCards, setLoopedCards] = useState<FlashcardData[]>(cards);
   const containerRef = useRef<HTMLDivElement>(null);
+  const appendedAtBottomRef = useRef(false);
+
+  const shuffle = (array: FlashcardData[]) =>
+    [...array].sort(() => Math.random() - 0.5);
+
+  useEffect(() => {
+    setLoopedCards(cards);
+    setActiveIndex(0);
+    appendedAtBottomRef.current = false;
+    if (containerRef.current) {
+      containerRef.current.scrollTop = 0;
+    }
+  }, [cards]);
 
   /** iOS Safari often keeps momentum after CSS snap; snap to nearest slide in px when scrolling stops. */
   useEffect(() => {
     const el = containerRef.current;
-    if (!el || cards.length === 0) return;
+    if (!el || loopedCards.length === 0) return;
 
     const setSlideVar = () => {
       const h = el.clientHeight;
@@ -32,12 +46,17 @@ export function Scroller({ cards }: ScrollerProps) {
       if (h <= 0) return;
       const maxScroll = Math.max(0, el.scrollHeight - h);
       const idx = Math.min(
-        cards.length - 1,
+        loopedCards.length - 1,
         Math.max(0, Math.round(el.scrollTop / h))
       );
       const target = Math.min(idx * h, maxScroll);
       if (Math.abs(el.scrollTop - target) <= 1) return;
       el.scrollTop = target;
+    };
+
+    const reshuffleDeck = () => {
+      if (cards.length === 0) return;
+      setLoopedCards((prev) => [...prev, ...shuffle(cards)]);
     };
 
     setSlideVar();
@@ -46,6 +65,17 @@ export function Scroller({ cards }: ScrollerProps) {
 
     let debounce: ReturnType<typeof setTimeout> | undefined;
     const onScroll = () => {
+      const isNearBottom =
+        el.scrollTop + el.clientHeight >= el.scrollHeight - 50;
+      if (isNearBottom) {
+        if (!appendedAtBottomRef.current) {
+          appendedAtBottomRef.current = true;
+          reshuffleDeck();
+        }
+      } else {
+        appendedAtBottomRef.current = false;
+      }
+
       if (debounce) clearTimeout(debounce);
       debounce = setTimeout(() => {
         debounce = undefined;
@@ -70,11 +100,11 @@ export function Scroller({ cards }: ScrollerProps) {
       el.removeEventListener("scroll", onScroll);
       if (debounce) clearTimeout(debounce);
     };
-  }, [cards.length]);
+  }, [cards, loopedCards.length]);
 
   useEffect(() => {
     const root = containerRef.current;
-    if (!root || cards.length === 0) return;
+    if (!root || loopedCards.length === 0) return;
 
     const slides = root.querySelectorAll("[data-snap-slide]");
     const observer = new IntersectionObserver(
@@ -91,7 +121,7 @@ export function Scroller({ cards }: ScrollerProps) {
 
     slides.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
-  }, [cards.length]);
+  }, [loopedCards.length]);
 
   return (
     <div className="flex h-[100dvh] flex-col bg-zinc-950 text-zinc-100">
@@ -106,20 +136,20 @@ export function Scroller({ cards }: ScrollerProps) {
           className="shrink-0 text-sm tabular-nums text-zinc-500"
           aria-live="polite"
         >
-          {cards.length > 0 ? `${activeIndex + 1} / ${cards.length}` : ""}
+          {loopedCards.length > 0 ? `${activeIndex + 1}` : ""}
         </span>
       </header>
 
       <div
         ref={containerRef}
-        className="scroller min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y"
+        className="scroller min-h-0 flex-1 snap-y snap-mandatory overflow-y-auto overscroll-y-contain touch-pan-y"
       >
-        {cards.map((card, index) => (
+        {loopedCards.map((card, index) => (
           <section
             key={`${index}-${card.question.slice(0, 24)}`}
             data-snap-slide
             data-index={index}
-            className="flex w-full shrink-0 flex-col items-center justify-center px-4 py-6"
+            className="flex h-[100dvh] w-full shrink-0 snap-start flex-col items-center justify-center px-4 py-6"
           >
             <Flashcard question={card.question} answer={card.answer} />
           </section>
