@@ -49,7 +49,7 @@ export default function Landing() {
               Sign In
             </Link>
             <Link
-              to="/app"
+              to="/learn"
               onClick={handleStartClick}
               className="inline-flex min-h-[44px] touch-manipulation items-center rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-emerald-400"
             >

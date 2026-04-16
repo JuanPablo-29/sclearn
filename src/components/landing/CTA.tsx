@@ -16,7 +16,7 @@ export function CTA({ onAppCtaClick }: CTAProps) {
             Jump in and turn your next set of notes into a deck in minutes.
           </p>
           <Link
-            to="/app"
+            to="/learn"
             onClick={onAppCtaClick}
             className="mt-8 inline-flex min-h-[44px] touch-manipulation items-center justify-center rounded-xl bg-emerald-500 px-6 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400"
           >

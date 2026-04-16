@@ -32,15 +32,14 @@ export function Hero({ onAppCtaClick }: HeroProps) {
               Turn Your Notes Into Addictive Study Scrolls
             </h1>
             <p className="mx-auto max-w-xl text-pretty text-base text-zinc-400 sm:text-lg">
-              Sclearn combines scrolling and learning. Generate flashcards from
-              your notes and study them with an addictive swipe-based interface
-              designed to keep you engaged.
+              Paste notes or enter any subject and instantly turn it into an
+              addictive scroll-based study experience.
             </p>
           </div>
 
           <div className="mt-10 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center sm:justify-center">
             <Link
-              to="/app"
+              to="/learn"
               onClick={onAppCtaClick}
               className="inline-flex min-h-[48px] touch-manipulation items-center justify-center rounded-xl bg-emerald-500 px-8 py-3.5 text-center text-base font-semibold text-zinc-950 shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-400 sm:min-h-[44px]"
             >

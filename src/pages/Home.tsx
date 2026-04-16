@@ -124,7 +124,7 @@ export default function Home() {
 
         <div className="flex flex-col gap-2">
           <label htmlFor="notes" className="text-sm font-medium text-zinc-300">
-            Your notes
+            Paste notes or enter a subject
           </label>
           <textarea
             id="notes"
@@ -132,11 +132,14 @@ export default function Home() {
             value={notes}
             onChange={(e) => setNotes(e.currentTarget.value)}
             autoComplete="off"
-            placeholder="Paste notes here…"
+            placeholder="Paste notes or type a subject like 'Biology basics' or 'World War 2'…"
             rows={10}
             disabled={!user || authLoading}
             className="min-h-[200px] w-full resize-y rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-base leading-relaxed text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-600/60 focus:outline-none focus:ring-2 focus:ring-emerald-600/30 disabled:opacity-50 sm:min-h-[260px]"
           />
+          <p className="text-xs text-zinc-500">
+            {`Tip: Try a subject like 'Chemistry basics' or paste your own notes.`}
+          </p>
           <p className="text-xs text-zinc-500" aria-live="polite">
             {notes.length} characters · trimmed {notes.trim().length}
           </p>
@@ -176,7 +179,7 @@ export default function Home() {
           </div>
           {notes.trim().length === 0 && !loading && user ? (
             <p className="mt-2 text-center text-xs text-zinc-600 sm:text-left">
-              Type or paste notes to enable Generate.
+              Add notes or a subject to enable Generate.
             </p>
           ) : null}
         </div>
