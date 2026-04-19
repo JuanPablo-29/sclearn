@@ -1,14 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { SaveDeckModal } from "@/components/SaveDeckModal";
 import { useAuth } from "@/context/AuthContext";
 import { trackEvent } from "@/lib/analytics";
-import { DECK_LIMIT_ERROR, FREE_DECK_LIMIT, saveDeck } from "@/lib/decks";
 import { replaceUserFlashcards } from "@/lib/flashcardsDb";
 import type { Flashcard } from "@/lib/flashcard";
 import { generateFlashcardsFromNotes } from "@/lib/generateFlashcardsApi";
 import { supabase } from "@/lib/supabase";
-
-const DEFAULT_DECK_TITLE = "Biology Notes";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -20,9 +18,6 @@ export default function Home() {
     Flashcard[] | null
   >(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
-  const [deckTitle, setDeckTitle] = useState(DEFAULT_DECK_TITLE);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [savingDeck, setSavingDeck] = useState(false);
 
   async function handleGenerate() {
     if (!user) return;
@@ -48,98 +43,17 @@ export default function Home() {
     }
   }
 
-  async function handleConfirmSaveDeck() {
-    if (!user || !lastGeneratedCards?.length) return;
-    setSaveError(null);
-    setSavingDeck(true);
-    try {
-      await saveDeck({
-        title: deckTitle.trim() || DEFAULT_DECK_TITLE,
-        cards: lastGeneratedCards,
-      });
-      trackEvent("deck_saved", { card_count: lastGeneratedCards.length });
-      setSaveModalOpen(false);
-      setLastGeneratedCards(null);
-    } catch (e) {
-      const msg =
-        e instanceof Error ? e.message : "Failed to save deck. Try again.";
-      setSaveError(msg);
-      if (msg === DECK_LIMIT_ERROR || msg.includes("free limit of 3")) {
-        trackEvent("deck_limit_reached");
-      }
-    } finally {
-      setSavingDeck(false);
-    }
-  }
-
   const canGenerate =
     Boolean(user) && notes.trim().length > 0 && !loading && !authLoading;
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-zinc-950 text-zinc-100">
-      {saveModalOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center"
-          role="presentation"
-          onClick={() => !savingDeck && setSaveModalOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="save-deck-title"
-            className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900 p-5 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2
-              id="save-deck-title"
-              className="text-lg font-semibold text-zinc-100"
-            >
-              Save deck
-            </h2>
-            <p className="mt-1 text-sm text-zinc-500">
-              Choose a title (max {FREE_DECK_LIMIT} saved decks on the free plan).
-            </p>
-            <label
-              htmlFor="deck-title"
-              className="mt-4 block text-sm font-medium text-zinc-300"
-            >
-              Title
-            </label>
-            <input
-              id="deck-title"
-              type="text"
-              value={deckTitle}
-              onChange={(e) => setDeckTitle(e.currentTarget.value)}
-              disabled={savingDeck}
-              className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-600/60 focus:outline-none focus:ring-2 focus:ring-emerald-600/30 disabled:opacity-50"
-              autoComplete="off"
-            />
-            {saveError ? (
-              <p className="mt-3 text-sm text-red-400" role="alert">
-                {saveError}
-              </p>
-            ) : null}
-            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                disabled={savingDeck}
-                onClick={() => setSaveModalOpen(false)}
-                className="inline-flex min-h-[44px] touch-manipulation items-center justify-center rounded-xl border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={savingDeck}
-                onClick={() => void handleConfirmSaveDeck()}
-                className="inline-flex min-h-[44px] touch-manipulation items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-              >
-                {savingDeck ? "Saving…" : "Save"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <SaveDeckModal
+        open={saveModalOpen}
+        onClose={() => setSaveModalOpen(false)}
+        cards={lastGeneratedCards ?? []}
+        onSaved={() => setLastGeneratedCards(null)}
+      />
 
       <header className="shrink-0 border-b border-zinc-800 px-4 py-4 sm:px-6 sm:py-5">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
@@ -234,7 +148,8 @@ export default function Home() {
               {lastGeneratedCards.length} flashcards ready
             </p>
             <p className="mt-1 text-xs text-zinc-500">
-              Study now or save this run as a deck (up to 3 saved decks).
+              Study now and save later from the study screen, or save this run
+              here (up to 3 saved decks).
             </p>
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               <button
@@ -246,11 +161,7 @@ export default function Home() {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setDeckTitle(DEFAULT_DECK_TITLE);
-                  setSaveError(null);
-                  setSaveModalOpen(true);
-                }}
+                onClick={() => setSaveModalOpen(true)}
                 className="inline-flex min-h-[44px] touch-manipulation items-center justify-center rounded-xl border border-emerald-700/60 bg-zinc-900/80 px-5 py-2.5 text-sm font-semibold text-emerald-100 hover:bg-zinc-800"
               >
                 Save Deck

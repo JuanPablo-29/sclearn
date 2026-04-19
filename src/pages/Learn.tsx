@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { SaveDeckModal } from "@/components/SaveDeckModal";
 import { Scroller } from "@/components/Scroller";
 import { useAuth } from "@/context/AuthContext";
 import { trackEvent } from "@/lib/analytics";
@@ -20,6 +21,7 @@ export default function Learn() {
   );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
   const studySessionTracked = useRef(false);
 
   const inSavedDeckMode = Boolean(user && deckId);
@@ -39,6 +41,8 @@ export default function Learn() {
       : sessionCards.length > 0
         ? "session"
         : "demo";
+
+  const canSaveSessionDeck = Boolean(user && studySource === "session");
 
   useEffect(() => {
     if (authLoading || dataLoading || loadError || cardsToShow.length === 0)
@@ -157,8 +161,31 @@ export default function Learn() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-zinc-950 text-zinc-100">
-      <Scroller cards={cardsToShow} />
+    <div className="flex h-[100dvh] flex-col bg-zinc-950 text-zinc-100">
+      <SaveDeckModal
+        open={saveModalOpen}
+        onClose={() => setSaveModalOpen(false)}
+        cards={sessionCards}
+      />
+      {canSaveSessionDeck ? (
+        <div className="shrink-0 border-b border-zinc-800 bg-zinc-900/80 px-3 py-2.5 sm:px-4">
+          <div className="mx-auto flex max-w-lg flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-center text-xs text-zinc-400 sm:text-left sm:text-sm">
+              Like this deck? Save it to your library (up to 3 decks).
+            </p>
+            <button
+              type="button"
+              onClick={() => setSaveModalOpen(true)}
+              className="inline-flex min-h-[44px] touch-manipulation items-center justify-center rounded-xl border border-emerald-700/50 bg-emerald-600/15 px-4 py-2 text-sm font-semibold text-emerald-200 hover:bg-emerald-600/25"
+            >
+              Save deck
+            </button>
+          </div>
+        </div>
+      ) : null}
+      <div className="flex min-h-0 flex-1 flex-col">
+        <Scroller cards={cardsToShow} />
+      </div>
     </div>
   );
 }

@@ -124,7 +124,7 @@ export function Scroller({ cards }: ScrollerProps) {
   }, [loopedCards.length]);
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-zinc-950 text-zinc-100">
+    <div className="flex h-full min-h-0 w-full flex-col bg-zinc-950 text-zinc-100">
       <header className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-800 bg-zinc-950 px-3 py-2 sm:gap-3 sm:px-4">
         <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
           <Link
