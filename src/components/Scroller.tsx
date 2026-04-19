@@ -125,13 +125,21 @@ export function Scroller({ cards }: ScrollerProps) {
 
   return (
     <div className="flex h-[100dvh] flex-col bg-zinc-950 text-zinc-100">
-      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-950 px-4 py-2">
-        <Link
-          to="/app"
-          className="inline-flex min-h-[44px] min-w-[44px] touch-manipulation items-center rounded-lg px-2 text-sm text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200"
-        >
-          ← Home
-        </Link>
+      <header className="flex shrink-0 items-center justify-between gap-2 border-b border-zinc-800 bg-zinc-950 px-3 py-2 sm:gap-3 sm:px-4">
+        <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+          <Link
+            to="/app"
+            className="inline-flex min-h-[44px] shrink-0 touch-manipulation items-center rounded-lg px-2 text-sm text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200"
+          >
+            ← Home
+          </Link>
+          <Link
+            to="/decks"
+            className="inline-flex min-h-[44px] max-w-[7.5rem] min-w-0 shrink-0 touch-manipulation items-center truncate rounded-lg px-2 text-sm text-emerald-400/90 hover:bg-zinc-800/60 hover:text-emerald-300 sm:max-w-none"
+          >
+            My Decks
+          </Link>
+        </div>
         <span
           className="shrink-0 text-sm tabular-nums text-zinc-500"
           aria-live="polite"

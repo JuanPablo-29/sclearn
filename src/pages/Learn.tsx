@@ -1,66 +1,124 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Scroller } from "@/components/Scroller";
 import { useAuth } from "@/context/AuthContext";
 import { trackEvent } from "@/lib/analytics";
 import { demoDeck } from "@/lib/demoDeck";
+import { getDeckById } from "@/lib/decks";
 import { fetchUserFlashcards } from "@/lib/flashcardsDb";
 import type { Flashcard } from "@/lib/flashcard";
 import { supabase } from "@/lib/supabase";
 
 export default function Learn() {
   const { user, loading: authLoading } = useAuth();
-  const [cards, setCards] = useState<Flashcard[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const deckId = searchParams.get("deck");
+
+  const [sessionCards, setSessionCards] = useState<Flashcard[]>([]);
+  const [savedDeckCards, setSavedDeckCards] = useState<Flashcard[] | null>(
+    null
+  );
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [dataLoading, setDataLoading] = useState(true);
   const studySessionTracked = useRef(false);
-  const cardsToShow = cards.length > 0 ? cards : demoDeck;
+
+  const inSavedDeckMode = Boolean(user && deckId);
+
+  const cardsToShow: Flashcard[] =
+    savedDeckCards && savedDeckCards.length > 0
+      ? savedDeckCards
+      : sessionCards.length > 0
+        ? sessionCards
+        : inSavedDeckMode
+          ? []
+          : demoDeck;
+
+  const studySource =
+    savedDeckCards && savedDeckCards.length > 0
+      ? "saved_deck"
+      : sessionCards.length > 0
+        ? "session"
+        : "demo";
 
   useEffect(() => {
-    if (authLoading || loading || error || cardsToShow.length === 0) return;
+    if (authLoading || dataLoading || loadError || cardsToShow.length === 0)
+      return;
     if (studySessionTracked.current) return;
     studySessionTracked.current = true;
     trackEvent("study_session_started", {
       card_count: cardsToShow.length,
-      source: cards.length > 0 ? "user" : "demo",
+      source: studySource,
+      deck_id: deckId ?? undefined,
     });
-  }, [authLoading, loading, error, cards.length, cardsToShow.length]);
+  }, [
+    authLoading,
+    dataLoading,
+    loadError,
+    cardsToShow.length,
+    studySource,
+    deckId,
+  ]);
 
   useEffect(() => {
     if (authLoading) return;
 
-    if (!user) {
-      setCards([]);
-      setLoading(false);
-      return;
+    let cancelled = false;
+    studySessionTracked.current = false;
+
+    async function load() {
+      setDataLoading(true);
+      setLoadError(null);
+
+      try {
+        if (!user) {
+          setSessionCards([]);
+          setSavedDeckCards(null);
+          if (deckId) {
+            setLoadError(
+              "Sign in to open a saved deck, or remove ?deck= from the URL to try the demo."
+            );
+          }
+          return;
+        }
+
+        if (deckId) {
+          const deck = await getDeckById(deckId);
+          if (cancelled) return;
+          if (!deck || deck.cards.length === 0) {
+            setSavedDeckCards(null);
+            setSessionCards([]);
+            setLoadError("Deck not found or has no cards.");
+            return;
+          }
+          setSavedDeckCards(deck.cards);
+          setSessionCards([]);
+          return;
+        }
+
+        const data = await fetchUserFlashcards(supabase, user.id);
+        if (cancelled) return;
+        setSessionCards(data);
+        setSavedDeckCards(null);
+      } catch (e) {
+        if (!cancelled) {
+          setLoadError(
+            e instanceof Error ? e.message : "Failed to load study content"
+          );
+          setSessionCards([]);
+          setSavedDeckCards(null);
+        }
+      } finally {
+        if (!cancelled) setDataLoading(false);
+      }
     }
 
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    fetchUserFlashcards(supabase, user.id)
-      .then((data) => {
-        if (!cancelled) {
-          setCards(data);
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Failed to load cards");
-          setCards([]);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
+    void load();
     return () => {
       cancelled = true;
     };
-  }, [user, authLoading]);
+  }, [authLoading, user, deckId]);
 
-  if (authLoading || loading) {
+  if (authLoading || dataLoading) {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center bg-zinc-950 text-zinc-400">
         Loading…
@@ -68,16 +126,32 @@ export default function Learn() {
     );
   }
 
-  if (error) {
+  if (loadError) {
     return (
       <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 bg-zinc-950 px-4 text-center text-zinc-100">
-        <p className="text-sm text-red-400">{error}</p>
-        <Link
-          to="/app"
-          className="text-sm text-emerald-400 hover:text-emerald-300"
-        >
-          ← Home
-        </Link>
+        <p className="max-w-sm text-sm text-red-400">{loadError}</p>
+        {!user && deckId ? (
+          <Link
+            to="/login"
+            className="inline-flex min-h-[44px] touch-manipulation items-center justify-center rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-500"
+          >
+            Sign in
+          </Link>
+        ) : null}
+        <div className="flex flex-wrap justify-center gap-3 text-sm">
+          <Link
+            to="/decks"
+            className="text-emerald-400 hover:text-emerald-300"
+          >
+            My Decks
+          </Link>
+          <Link to="/app" className="text-zinc-500 hover:text-zinc-300">
+            ← Home
+          </Link>
+          <Link to="/learn" className="text-zinc-500 hover:text-zinc-300">
+            Demo feed
+          </Link>
+        </div>
       </div>
     );
   }
