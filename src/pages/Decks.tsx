@@ -4,10 +4,25 @@ import { useAuth } from "@/context/AuthContext";
 import { trackEvent } from "@/lib/analytics";
 import {
   deleteDeck,
+  disableDeckSharing,
+  enableDeckSharing,
   FREE_DECK_LIMIT,
   getUserDecks,
   type SavedDeck,
 } from "@/lib/decks";
+
+function slugFromShareUrl(url: string): string {
+  try {
+    return new URL(url).pathname.replace(/^\/deck\//, "").replace(/\/$/, "");
+  } catch {
+    const idx = url.indexOf("/deck/");
+    return idx >= 0 ? (url.slice(idx + 6).split(/[?#]/)[0] ?? "") : "";
+  }
+}
+
+async function copyToClipboard(text: string): Promise<void> {
+  await navigator.clipboard.writeText(text);
+}
 
 function formatDate(iso: string): string {
   try {
@@ -27,7 +42,9 @@ export default function Decks() {
   const [decks, setDecks] = useState<SavedDeck[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [sharingId, setSharingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -54,6 +71,12 @@ export default function Decks() {
     void load();
   }, [authLoading, user, load]);
 
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 2800);
+    return () => window.clearTimeout(t);
+  }, [toast]);
+
   async function handleDelete(id: string) {
     if (!window.confirm("Delete this deck? This cannot be undone.")) return;
     setDeletingId(id);
@@ -71,6 +94,69 @@ export default function Decks() {
 
   function handleOpen(id: string) {
     navigate(`/learn?deck=${encodeURIComponent(id)}`);
+  }
+
+  function shareUrlForSlug(slug: string): string {
+    const origin =
+      typeof window !== "undefined" && window.location?.origin
+        ? window.location.origin
+        : "";
+    return `${origin}/deck/${slug}`;
+  }
+
+  async function handleShareDeck(deck: SavedDeck) {
+    setSharingId(deck.id);
+    setError(null);
+    try {
+      const url = await enableDeckSharing(deck.id);
+      await copyToClipboard(url);
+      const newSlug = slugFromShareUrl(url);
+      trackEvent("deck_shared", { deck_id: deck.id });
+      trackEvent("share_link_copied", { deck_id: deck.id, source: "enable" });
+      setToast("Share link copied!");
+      setDecks((prev) =>
+        prev.map((d) =>
+          d.id === deck.id
+            ? { ...d, is_public: true, share_slug: newSlug || d.share_slug }
+            : d
+        )
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not enable sharing");
+    } finally {
+      setSharingId(null);
+    }
+  }
+
+  async function handleCopyShareLink(deck: SavedDeck) {
+    if (!deck.share_slug) return;
+    setError(null);
+    try {
+      await copyToClipboard(shareUrlForSlug(deck.share_slug));
+      trackEvent("share_link_copied", { deck_id: deck.id, source: "copy" });
+      setToast("Share link copied!");
+    } catch {
+      setError("Could not copy to clipboard. Copy the link manually.");
+    }
+  }
+
+  async function handleDisableSharing(deck: SavedDeck) {
+    setSharingId(deck.id);
+    setError(null);
+    try {
+      await disableDeckSharing(deck.id);
+      trackEvent("deck_unshared", { deck_id: deck.id });
+      setDecks((prev) =>
+        prev.map((d) =>
+          d.id === deck.id ? { ...d, is_public: false } : d
+        )
+      );
+      setToast("Sharing turned off.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not disable sharing");
+    } finally {
+      setSharingId(null);
+    }
   }
 
   if (authLoading) {
@@ -134,6 +220,15 @@ export default function Decks() {
           </p>
         ) : null}
 
+        {toast ? (
+          <p
+            className="mb-4 rounded-xl border border-emerald-900/40 bg-emerald-950/35 px-4 py-2.5 text-center text-sm text-emerald-100"
+            role="status"
+          >
+            {toast}
+          </p>
+        ) : null}
+
         {loading ? (
           <p className="text-sm text-zinc-500">Loading decks…</p>
         ) : decks.length === 0 ? (
@@ -166,14 +261,43 @@ export default function Decks() {
                     {formatDate(deck.created_at)}
                   </p>
                 </div>
-                <div className="mt-4 flex shrink-0 gap-2 sm:mt-0">
+                <div className="mt-4 flex w-full flex-wrap gap-2 sm:mt-0 sm:max-w-md sm:justify-end">
                   <button
                     type="button"
                     onClick={() => handleOpen(deck.id)}
-                    className="inline-flex min-h-[44px] flex-1 touch-manipulation items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 sm:flex-none"
+                    className="inline-flex min-h-[44px] flex-1 touch-manipulation items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 sm:flex-none sm:min-w-[5.5rem]"
                   >
                     Open
                   </button>
+                  {deck.is_public && deck.share_slug ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled={sharingId === deck.id}
+                        onClick={() => void handleCopyShareLink(deck)}
+                        className="inline-flex min-h-[44px] flex-1 touch-manipulation items-center justify-center rounded-xl border border-emerald-800/60 bg-emerald-950/30 px-4 py-2 text-sm font-medium text-emerald-200 hover:bg-emerald-950/50 disabled:opacity-50 sm:flex-none"
+                      >
+                        Copy link
+                      </button>
+                      <button
+                        type="button"
+                        disabled={sharingId === deck.id}
+                        onClick={() => void handleDisableSharing(deck)}
+                        className="inline-flex min-h-[44px] flex-1 touch-manipulation items-center justify-center rounded-xl border border-zinc-600 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-50 sm:flex-none"
+                      >
+                        {sharingId === deck.id ? "Disabling…" : "Disable sharing"}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={sharingId === deck.id}
+                      onClick={() => void handleShareDeck(deck)}
+                      className="inline-flex min-h-[44px] flex-1 touch-manipulation items-center justify-center rounded-xl border border-emerald-800/60 bg-emerald-950/25 px-4 py-2 text-sm font-medium text-emerald-200 hover:bg-emerald-950/40 disabled:opacity-50 sm:flex-none"
+                    >
+                      {sharingId === deck.id ? "Working…" : "Share"}
+                    </button>
+                  )}
                   <button
                     type="button"
                     disabled={deletingId === deck.id}

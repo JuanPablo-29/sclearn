@@ -174,3 +174,122 @@ export async function deleteDeck(id: string): Promise<void> {
   const { error } = await supabase.from("decks").delete().eq("id", id);
   if (error) throw new Error(error.message);
 }
+
+/** Safe payload for anonymous viewers (no user_id). */
+export type PublicDeckPayload = {
+  title: string;
+  cards: Flashcard[];
+};
+
+function shareOrigin(): string {
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return window.location.origin;
+  }
+  return "";
+}
+
+function slugifyTitle(raw: string): string {
+  const s = raw
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}+/gu, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+  return s.length > 0 ? s : "deck";
+}
+
+function randomSuffix(len: number): string {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let out = "";
+  for (let i = 0; i < len; i++) {
+    out += chars[Math.floor(Math.random() * chars.length)]!;
+  }
+  return out;
+}
+
+function isUniqueViolation(err: { code?: string; message?: string }): boolean {
+  return (
+    err.code === "23505" ||
+    Boolean(err.message?.toLowerCase().includes("duplicate")) ||
+    Boolean(err.message?.toLowerCase().includes("unique"))
+  );
+}
+
+/**
+ * Load a publicly shared deck by slug (anon-safe RPC — only title + cards).
+ */
+export async function getPublicDeckBySlug(
+  slug: string
+): Promise<PublicDeckPayload | null> {
+  const trimmed = slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
+  if (!trimmed) return null;
+
+  const { data, error } = await supabase.rpc("get_public_deck_by_slug", {
+    p_slug: trimmed,
+  });
+
+  if (error) throw new Error(error.message);
+  if (data == null || typeof data !== "object") return null;
+
+  const o = data as Record<string, unknown>;
+  const title = o.title;
+  const cardsRaw = o.cards;
+  if (typeof title !== "string") return null;
+  const cards = parseCardsJson(cardsRaw);
+  if (cards.length === 0) return null;
+
+  return { title: title.trim() || "Shared deck", cards };
+}
+
+/**
+ * Turn on public sharing. If `share_slug` was cleared only in DB by mistake,
+ * generates a new slug; otherwise reuses slug and only sets `is_public`.
+ * @returns Full URL to copy (e.g. `https://example.com/deck/biology-a8f3`)
+ */
+export async function enableDeckSharing(deckId: string): Promise<string> {
+  await requireUserId();
+  const deck = await getDeckById(deckId);
+  if (!deck) throw new Error("Deck not found.");
+
+  const origin = shareOrigin();
+
+  if (deck.share_slug) {
+    const { error } = await supabase
+      .from("decks")
+      .update({ is_public: true })
+      .eq("id", deckId);
+    if (error) throw new Error(error.message);
+    return `${origin}/deck/${deck.share_slug}`;
+  }
+
+  let lastErr: Error | null = null;
+  for (let i = 0; i < 24; i++) {
+    const newSlug = `${slugifyTitle(deck.title)}-${randomSuffix(4)}`;
+    const { error } = await supabase
+      .from("decks")
+      .update({ is_public: true, share_slug: newSlug })
+      .eq("id", deckId);
+
+    if (!error) {
+      return `${origin}/deck/${newSlug}`;
+    }
+    if (isUniqueViolation(error)) {
+      lastErr = new Error(error.message);
+      continue;
+    }
+    throw new Error(error.message);
+  }
+  throw lastErr ?? new Error("Could not create a unique share link.");
+}
+
+/** Stops public access; keeps `share_slug` for a future re-share. */
+export async function disableDeckSharing(deckId: string): Promise<void> {
+  await requireUserId();
+  const { error } = await supabase
+    .from("decks")
+    .update({ is_public: false })
+    .eq("id", deckId);
+  if (error) throw new Error(error.message);
+}

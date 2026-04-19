@@ -7,6 +7,7 @@ import Learn from "@/pages/Learn";
 import Login from "@/pages/Login";
 import Privacy from "@/pages/Privacy";
 import Register from "@/pages/Register";
+import SharedDeck from "@/pages/SharedDeck";
 import Terms from "@/pages/Terms";
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="/app" element={<Home />} />
           <Route path="/learn" element={<Learn />} />
           <Route path="/decks" element={<Decks />} />
+          <Route path="/deck/:slug" element={<SharedDeck />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/privacy" element={<Privacy />} />
