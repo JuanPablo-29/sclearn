@@ -20,8 +20,63 @@ function slugFromShareUrl(url: string): string {
   }
 }
 
-async function copyToClipboard(text: string): Promise<void> {
-  await navigator.clipboard.writeText(text);
+const canNativeShare =
+  typeof navigator !== "undefined" &&
+  typeof navigator.share === "function";
+
+const canClipboard =
+  typeof navigator !== "undefined" &&
+  Boolean(navigator.clipboard) &&
+  typeof navigator.clipboard?.writeText === "function";
+
+function isAbortError(e: unknown): boolean {
+  if (e instanceof DOMException && e.name === "AbortError") return true;
+  if (e instanceof Error && e.name === "AbortError") return true;
+  return false;
+}
+
+type PresentShareResult = "native_share" | "clipboard" | "fallback" | "cancelled";
+
+/**
+ * After a share URL exists: try Web Share → clipboard → caller shows manual fallback.
+ * Never throws for user-cancelled share sheet or clipboard denial (Safari).
+ */
+async function presentShareableUrl(
+  url: string,
+  deckTitle: string,
+  deckId: string,
+  clipboardSource: "enable" | "copy" | "share_flow"
+): Promise<PresentShareResult> {
+  if (canNativeShare) {
+    try {
+      await navigator.share({
+        title: deckTitle,
+        text: "Study this deck on Sclearn",
+        url,
+      });
+      trackEvent("share_sheet_opened", { deck_id: deckId });
+      return "native_share";
+    } catch (e) {
+      if (isAbortError(e)) return "cancelled";
+      // Share failed (e.g. not allowed) — try clipboard next
+    }
+  }
+
+  if (canClipboard) {
+    try {
+      await navigator.clipboard.writeText(url);
+      trackEvent("share_link_copied", {
+        deck_id: deckId,
+        source: clipboardSource,
+      });
+      return "clipboard";
+    } catch {
+      // Clipboard blocked — manual fallback
+    }
+  }
+
+  trackEvent("share_fallback_used", { deck_id: deckId });
+  return "fallback";
 }
 
 function formatDate(iso: string): string {
@@ -45,6 +100,12 @@ export default function Decks() {
   const [toast, setToast] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [sharingId, setSharingId] = useState<string | null>(null);
+  const [linkFallback, setLinkFallback] = useState<{
+    url: string;
+    deckTitle: string;
+    deckId: string;
+    variant: "just_shared" | "copy_only";
+  } | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -109,11 +170,8 @@ export default function Decks() {
     setError(null);
     try {
       const url = await enableDeckSharing(deck.id);
-      await copyToClipboard(url);
       const newSlug = slugFromShareUrl(url);
       trackEvent("deck_shared", { deck_id: deck.id });
-      trackEvent("share_link_copied", { deck_id: deck.id, source: "enable" });
-      setToast("Share link copied!");
       setDecks((prev) =>
         prev.map((d) =>
           d.id === deck.id
@@ -121,8 +179,25 @@ export default function Decks() {
             : d
         )
       );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not enable sharing");
+
+      const result = await presentShareableUrl(
+        url,
+        deck.title,
+        deck.id,
+        "enable"
+      );
+      if (result === "clipboard") {
+        setToast("Share link copied!");
+      } else if (result === "fallback") {
+        setLinkFallback({
+          url,
+          deckTitle: deck.title,
+          deckId: deck.id,
+          variant: "just_shared",
+        });
+      }
+    } catch {
+      setError("Unable to create share link.");
     } finally {
       setSharingId(null);
     }
@@ -131,12 +206,22 @@ export default function Decks() {
   async function handleCopyShareLink(deck: SavedDeck) {
     if (!deck.share_slug) return;
     setError(null);
-    try {
-      await copyToClipboard(shareUrlForSlug(deck.share_slug));
-      trackEvent("share_link_copied", { deck_id: deck.id, source: "copy" });
+    const url = shareUrlForSlug(deck.share_slug);
+    const result = await presentShareableUrl(
+      url,
+      deck.title,
+      deck.id,
+      "copy"
+    );
+    if (result === "clipboard") {
       setToast("Share link copied!");
-    } catch {
-      setError("Could not copy to clipboard. Copy the link manually.");
+    } else if (result === "fallback") {
+      setLinkFallback({
+        url,
+        deckTitle: deck.title,
+        deckId: deck.id,
+        variant: "copy_only",
+      });
     }
   }
 
@@ -188,6 +273,75 @@ export default function Decks() {
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-zinc-950 text-zinc-100">
+      {linkFallback ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center"
+          role="presentation"
+          onClick={() => setLinkFallback(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="share-fallback-title"
+            className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900 p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="share-fallback-title"
+              className="text-lg font-semibold text-zinc-100"
+            >
+              {linkFallback.variant === "just_shared"
+                ? "Deck is shared"
+                : "Copy link"}
+            </h2>
+            <p className="mt-2 text-sm text-zinc-400">
+              {linkFallback.variant === "just_shared"
+                ? "Your deck is shared. Copy this link:"
+                : "Copy this link:"}
+            </p>
+            <p className="mt-1 truncate text-xs text-zinc-500" title={linkFallback.deckTitle}>
+              {linkFallback.deckTitle}
+            </p>
+            <input
+              readOnly
+              value={linkFallback.url}
+              className="mt-3 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100"
+              onFocus={(e) => e.currentTarget.select()}
+            />
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setLinkFallback(null)}
+                className="inline-flex min-h-[44px] touch-manipulation items-center justify-center rounded-xl border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-800"
+              >
+                Close
+              </button>
+              {canClipboard ? (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(linkFallback.url);
+                      trackEvent("share_link_copied", {
+                        deck_id: linkFallback.deckId,
+                        source: "share_flow",
+                      });
+                      setToast("Share link copied!");
+                      setLinkFallback(null);
+                    } catch {
+                      // Selection in the field is still available; no error state.
+                    }
+                  }}
+                  className="inline-flex min-h-[44px] touch-manipulation items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+                >
+                  Copy again
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <header className="shrink-0 border-b border-zinc-800 px-4 py-4 sm:px-6">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-3">
