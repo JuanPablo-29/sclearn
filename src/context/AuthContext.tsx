@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { identifyUser, resetAnalytics } from "@/lib/analytics";
-import { supabase } from "@/lib/supabase";
+import { getSiteUrl, supabase } from "@/lib/supabase";
 
 type AuthContextValue = {
   user: User | null;
@@ -61,7 +61,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signUp(email: string, password: string) {
-    const { error } = await supabase.auth.signUp({ email, password });
+    const redirectTo = `${getSiteUrl()}/learn`;
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: redirectTo,
+      },
+    });
     return { error: error ? new Error(error.message) : null };
   }
 
