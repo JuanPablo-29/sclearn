@@ -1,6 +1,11 @@
 import { useEffect, useId, useState } from "react";
 import { trackEvent } from "@/lib/analytics";
-import { DECK_LIMIT_ERROR, FREE_DECK_LIMIT, saveDeck } from "@/lib/decks";
+import { useAuth } from "@/context/AuthContext";
+import {
+  deckLimitForPlan,
+  isDeckSaveLimitError,
+  saveDeck,
+} from "@/lib/decks";
 import type { Flashcard } from "@/lib/flashcard";
 
 export const DEFAULT_DECK_TITLE = "Biology Notes";
@@ -12,6 +17,8 @@ type SaveDeckModalProps = {
   cards: Flashcard[];
   /** Called after a successful save (e.g. clear “unsaved” UI on Home). */
   onSaved?: () => void;
+  /** Free-tier deck cap — show upgrade modal from parent. */
+  onDeckLimit?: () => void;
 };
 
 export function SaveDeckModal({
@@ -19,8 +26,11 @@ export function SaveDeckModal({
   onClose,
   cards,
   onSaved,
+  onDeckLimit,
 }: SaveDeckModalProps) {
   const titleId = useId();
+  const { billing } = useAuth();
+  const deckCap = deckLimitForPlan(billing?.plan);
   const [title, setTitle] = useState(DEFAULT_DECK_TITLE);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -47,8 +57,13 @@ export function SaveDeckModal({
       const msg =
         e instanceof Error ? e.message : "Failed to save deck. Try again.";
       setSaveError(msg);
-      if (msg === DECK_LIMIT_ERROR || msg.includes("free limit of 3")) {
-        trackEvent("deck_limit_reached");
+      if (isDeckSaveLimitError(msg)) {
+        trackEvent("paywall_hit_deck_limit", {
+          plan: billing?.plan ?? "free",
+        });
+        if (billing?.plan !== "pro") {
+          onDeckLimit?.();
+        }
       }
     } finally {
       setSaving(false);
@@ -77,7 +92,7 @@ export function SaveDeckModal({
           Save deck
         </h2>
         <p className="mt-1 text-sm text-zinc-500">
-          Choose a title (max {FREE_DECK_LIMIT} saved decks on the free plan).
+          Choose a title (up to {deckCap} saved decks on your current plan).
         </p>
         <label
           htmlFor={`${titleId}-input`}

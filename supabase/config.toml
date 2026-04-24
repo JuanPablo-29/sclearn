@@ -3,3 +3,12 @@
 
 [functions.generate-flashcards]
 verify_jwt = false
+
+[functions.create-checkout-session]
+verify_jwt = false
+
+[functions.create-customer-portal]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false

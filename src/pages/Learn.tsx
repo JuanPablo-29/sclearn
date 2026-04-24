@@ -2,16 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { SaveDeckModal } from "@/components/SaveDeckModal";
 import { Scroller } from "@/components/Scroller";
+import { UpgradeModal } from "@/components/UpgradeModal";
 import { useAuth } from "@/context/AuthContext";
 import { trackEvent } from "@/lib/analytics";
 import { demoDeck } from "@/lib/demoDeck";
-import { getDeckById } from "@/lib/decks";
+import { deckLimitForPlan, getDeckById } from "@/lib/decks";
 import { fetchUserFlashcards } from "@/lib/flashcardsDb";
 import type { Flashcard } from "@/lib/flashcard";
 import { supabase } from "@/lib/supabase";
 
 export default function Learn() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, billing } = useAuth();
   const [searchParams] = useSearchParams();
   const deckId = searchParams.get("deck");
 
@@ -22,7 +23,9 @@ export default function Learn() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const studySessionTracked = useRef(false);
+  const deckCap = deckLimitForPlan(billing?.plan);
 
   const inSavedDeckMode = Boolean(user && deckId);
 
@@ -162,16 +165,22 @@ export default function Learn() {
 
   return (
     <div className="flex h-[100dvh] flex-col bg-zinc-950 text-zinc-100">
+      <UpgradeModal
+        open={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+      />
       <SaveDeckModal
         open={saveModalOpen}
         onClose={() => setSaveModalOpen(false)}
         cards={sessionCards}
+        onDeckLimit={() => setUpgradeOpen(true)}
       />
       {canSaveSessionDeck ? (
         <div className="shrink-0 border-b border-zinc-800 bg-zinc-900/80 px-3 py-2.5 sm:px-4">
           <div className="mx-auto flex max-w-lg flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-center text-xs text-zinc-400 sm:text-left sm:text-sm">
-              Like this deck? Save it to your library (up to 3 decks).
+              Like this deck? Save it to your library (up to {deckCap} decks on
+              your plan).
             </p>
             <button
               type="button"

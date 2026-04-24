@@ -109,5 +109,6 @@ The app calls the function with **`fetch`**, sending:
 ## Security notes
 
 - **Secret / service role** keys must never ship in the frontend; the app only uses the **publishable** key client-side.
+- Edge Functions that need the Postgres **service role** (e.g. **`stripe-webhook`**) must read it from a secret named **`SERVICE_ROLE_KEY`**. Custom secrets **must not** use the reserved `SUPABASE_` prefix (use `SERVICE_ROLE_KEY`, not `SUPABASE_SERVICE_ROLE_KEY`).
 - OpenAI calls happen **only** inside the Edge Function.
 - For production, consider tightening CORS on the Edge Function and rate limiting.

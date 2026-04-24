@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { BillingHeaderActions } from "@/components/BillingHeaderActions";
 import { useAuth } from "@/context/AuthContext";
 import { trackEvent } from "@/lib/analytics";
 import {
+  deckLimitForPlan,
   deleteDeck,
   disableDeckSharing,
   enableDeckSharing,
-  FREE_DECK_LIMIT,
   getUserDecks,
   type SavedDeck,
 } from "@/lib/decks";
@@ -93,7 +94,8 @@ function formatDate(iso: string): string {
 
 export default function Decks() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, billing } = useAuth();
+  const deckCap = deckLimitForPlan(billing?.plan);
   const [decks, setDecks] = useState<SavedDeck[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -355,12 +357,15 @@ export default function Decks() {
               My Decks
             </h1>
           </div>
-          <Link
-            to="/learn"
-            className="inline-flex min-h-[44px] touch-manipulation items-center text-sm text-emerald-400/90 hover:text-emerald-300"
-          >
-            Study →
-          </Link>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <BillingHeaderActions />
+            <Link
+              to="/learn"
+              className="inline-flex min-h-[44px] touch-manipulation items-center text-sm text-emerald-400/90 hover:text-emerald-300"
+            >
+              Study →
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -389,7 +394,8 @@ export default function Decks() {
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-6 py-10 text-center">
             <p className="text-sm text-zinc-400">
               No saved decks yet. Generate flashcards on the home page, then use
-              &quot;Save Deck&quot; to store up to {FREE_DECK_LIMIT} decks here.
+              &quot;Save Deck&quot; to store up to {deckCap} decks here on your
+              current plan.
             </p>
             <Link
               to="/app"

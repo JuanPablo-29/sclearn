@@ -6,14 +6,19 @@ const corsHeaders: Record<string, string> = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const DAILY_LIMIT = 10;
 const MAX_NOTES_LENGTH = 100_000;
 
 type Flashcard = { question: string; answer: string };
 
-type QuotaBeginResult = { allowed: boolean; log_id: string | null };
+type QuotaReserveResult = {
+  allowed: boolean;
+  code?: string;
+  plan?: string;
+  used?: number;
+  limit?: number;
+};
 
-function json(status: number, body: Record<string, string>): Response {
+function json(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -50,6 +55,21 @@ function getSupabasePublicClientKey(): string | undefined {
     Deno.env.get("SUPABASE_ANON_KEY")?.trim() ||
     undefined
   );
+}
+
+function paywallMessage(plan: string | undefined): { error: string; code: string } {
+  if (plan === "pro") {
+    return {
+      error:
+        "You've used your 200 generations this month. More credits reset next month.",
+      code: "generation_limit_pro",
+    };
+  }
+  return {
+    error:
+      "You've used your 3 free generations today. Upgrade to Pro for more access.",
+    code: "generation_limit_free",
+  };
 }
 
 Deno.serve(async (req) => {
@@ -112,30 +132,28 @@ Deno.serve(async (req) => {
   }
 
   const { data: quotaData, error: quotaError } = await supabase.rpc(
-    "begin_flashcard_generation",
-    { p_daily_limit: DAILY_LIMIT }
+    "reserve_ai_generation_slot"
   );
 
   if (quotaError) {
     return json(500, { error: "Internal server error" });
   }
 
-  const quota = quotaData as QuotaBeginResult | null;
-  if (!quota?.allowed || !quota.log_id) {
-    return json(429, { error: "Daily generation limit reached" });
+  const quota = quotaData as QuotaReserveResult | null;
+  if (!quota?.allowed) {
+    const pl = typeof quota?.plan === "string" ? quota.plan : "free";
+    const { error, code } = paywallMessage(pl);
+    return json(429, {
+      error,
+      code,
+      plan: pl,
+      used: quota?.used,
+      limit: quota?.limit,
+    });
   }
 
-  let reservationId: string | null = quota.log_id;
-
-  const releaseReservation = async () => {
-    const id = reservationId;
-    reservationId = null;
-    if (!id) return;
-    await supabase.rpc("finalize_flashcard_generation", {
-      p_log_id: id,
-      p_success: false,
-    });
-  };
+  const planAfterReserve =
+    typeof quota.plan === "string" ? quota.plan : "free";
 
   try {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -163,7 +181,6 @@ Deno.serve(async (req) => {
     });
 
     if (!res.ok) {
-      await releaseReservation();
       return json(502, { error: "Generation service temporarily unavailable" });
     }
 
@@ -172,7 +189,6 @@ Deno.serve(async (req) => {
     };
     const content = data.choices?.[0]?.message?.content?.trim() ?? "";
     if (!content) {
-      await releaseReservation();
       return json(502, { error: "Generation service temporarily unavailable" });
     }
 
@@ -180,33 +196,26 @@ Deno.serve(async (req) => {
     try {
       cards = parseFlashcardsJson(content);
     } catch {
-      await releaseReservation();
       return json(502, { error: "Generation service temporarily unavailable" });
     }
 
     if (cards.length === 0) {
-      await releaseReservation();
       return json(502, { error: "Generation service temporarily unavailable" });
     }
 
-    const { error: finalizeError } = await supabase.rpc(
-      "finalize_flashcard_generation",
-      { p_log_id: quota.log_id, p_success: true }
-    );
+    const { error: recordError } = await supabase.rpc("record_usage_event", {
+      p_type: "generation",
+    });
 
-    if (finalizeError) {
-      await releaseReservation();
+    if (recordError) {
       return json(500, { error: "Internal server error" });
     }
 
-    reservationId = null;
-
-    return new Response(JSON.stringify({ cards }), {
+    return new Response(JSON.stringify({ cards, plan: planAfterReserve }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch {
-    await releaseReservation();
     return json(500, { error: "Internal server error" });
   }
 });

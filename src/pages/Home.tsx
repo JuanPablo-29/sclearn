@@ -1,16 +1,20 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { BillingHeaderActions } from "@/components/BillingHeaderActions";
 import { SaveDeckModal } from "@/components/SaveDeckModal";
+import { UpgradeModal } from "@/components/UpgradeModal";
 import { useAuth } from "@/context/AuthContext";
 import { trackEvent } from "@/lib/analytics";
+import { deckLimitForPlan } from "@/lib/decks";
 import { replaceUserFlashcards } from "@/lib/flashcardsDb";
 import type { Flashcard } from "@/lib/flashcard";
 import { generateFlashcardsFromNotes } from "@/lib/generateFlashcardsApi";
+import { isQuotaBlockedError } from "@/lib/quotaErrors";
 import { supabase } from "@/lib/supabase";
 
 export default function Home() {
   const navigate = useNavigate();
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading, signOut, billing } = useAuth();
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,6 +22,8 @@ export default function Home() {
     Flashcard[] | null
   >(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const deckCap = deckLimitForPlan(billing?.plan);
 
   async function handleGenerate() {
     if (!user) return;
@@ -35,9 +41,18 @@ export default function Home() {
       trackEvent("flashcards_generated", { card_count: cards.length });
       setLastGeneratedCards(cards);
     } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Failed to generate flashcards"
-      );
+      if (isQuotaBlockedError(e) && e.quotaKind === "generation") {
+        if (e.plan === "free") {
+          setUpgradeOpen(true);
+          setError(null);
+        } else {
+          setError(e.message);
+        }
+      } else {
+        setError(
+          e instanceof Error ? e.message : "Failed to generate flashcards"
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -48,11 +63,16 @@ export default function Home() {
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-zinc-950 text-zinc-100">
+      <UpgradeModal
+        open={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+      />
       <SaveDeckModal
         open={saveModalOpen}
         onClose={() => setSaveModalOpen(false)}
         cards={lastGeneratedCards ?? []}
         onSaved={() => setLastGeneratedCards(null)}
+        onDeckLimit={() => setUpgradeOpen(true)}
       />
 
       <header className="shrink-0 border-b border-zinc-800 px-4 py-4 sm:px-6 sm:py-5">
@@ -81,6 +101,7 @@ export default function Home() {
           <div className="flex flex-wrap items-center justify-end gap-2">
             {user ? (
               <>
+                <BillingHeaderActions />
                 <span className="hidden max-w-[140px] truncate text-xs text-zinc-500 sm:inline">
                   {user.email}
                 </span>
@@ -105,6 +126,12 @@ export default function Home() {
                   className="inline-flex min-h-[44px] touch-manipulation items-center justify-center rounded-lg px-3 text-sm text-emerald-400 hover:text-emerald-300"
                 >
                   Register
+                </Link>
+                <Link
+                  to="/pricing"
+                  className="inline-flex min-h-[44px] touch-manipulation items-center justify-center rounded-lg px-2 text-sm text-zinc-400 hover:text-zinc-200"
+                >
+                  Pricing
                 </Link>
               </>
             )}
@@ -149,7 +176,7 @@ export default function Home() {
             </p>
             <p className="mt-1 text-xs text-zinc-500">
               Study now and save later from the study screen, or save this run
-              here (up to 3 saved decks).
+              here (up to {deckCap} saved decks on your plan).
             </p>
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               <button

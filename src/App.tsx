@@ -1,9 +1,11 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
+import BillingSuccess from "@/pages/BillingSuccess";
 import Decks from "@/pages/Decks";
 import Home from "@/pages/Home";
 import Landing from "@/pages/Landing";
 import Learn from "@/pages/Learn";
+import Pricing from "@/pages/Pricing";
 import Login from "@/pages/Login";
 import Privacy from "@/pages/Privacy";
 import Register from "@/pages/Register";
@@ -24,6 +26,8 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/billing/success" element={<BillingSuccess />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

@@ -1,11 +1,26 @@
 import type { Flashcard } from "@/lib/flashcard";
 import { supabase } from "@/lib/supabase";
 
-/** Max saved decks per user (free tier). Kept in one place for future plans / paywall. */
-export const FREE_DECK_LIMIT = 3;
+export function deckLimitForPlan(plan: string | null | undefined): number {
+  return plan === "pro" ? 10 : 3;
+}
 
-export const DECK_LIMIT_ERROR =
-  "You've reached the free limit of 3 saved decks. Delete one to save another.";
+export function deckLimitExceededMessage(plan: string | null | undefined): string {
+  if (plan === "pro") {
+    return "You've reached the Pro limit of 10 saved decks. Delete one to save another.";
+  }
+  return "You've reached the free limit of 3 saved decks. Delete one to save another, or upgrade to Pro for more space.";
+}
+
+export function isDeckSaveLimitError(message: string): boolean {
+  return (
+    message.includes("saved deck limit") ||
+    message.includes("10 saved decks") ||
+    message.includes("3 saved decks") ||
+    message.includes("Pro limit of 10") ||
+    message.includes("free limit of 3")
+  );
+}
 
 /** Row shape from `public.decks` — ready for sharing fields in phase 2. */
 export type SavedDeck = {
@@ -64,12 +79,14 @@ function mapRow(row: DeckRow): SavedDeck {
 }
 
 function isDeckLimitDbMessage(message: string): boolean {
-  return message.includes("free limit of 3 saved decks");
+  return message.toLowerCase().includes("deck limit reached");
 }
 
 function mapSaveError(err: { message?: string }): string {
   const msg = err.message ?? "";
-  if (isDeckLimitDbMessage(msg)) return DECK_LIMIT_ERROR;
+  if (isDeckLimitDbMessage(msg)) {
+    return "You've reached your saved deck limit for this plan. Delete a deck or upgrade to Pro for more space.";
+  }
   return msg || "Failed to save deck";
 }
 
@@ -82,6 +99,17 @@ async function requireUserId(): Promise<string> {
     throw new Error("Sign in to manage saved decks.");
   }
   return user.id;
+}
+
+async function fetchUserPlan(userId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("plan")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error || !data) return "free";
+  const row = data as { plan?: string };
+  return typeof row.plan === "string" ? row.plan : "free";
 }
 
 export async function getUserDecks(): Promise<SavedDeck[]> {
@@ -128,8 +156,7 @@ export async function countUserDecks(): Promise<number> {
 }
 
 /**
- * Persists a deck for the signed-in user. Enforces {@link FREE_DECK_LIMIT}
- * (client pre-check + DB trigger).
+ * Persists a deck for the signed-in user. Enforces plan deck cap (client + DB trigger).
  */
 export async function saveDeck(params: {
   title: string;
@@ -141,9 +168,11 @@ export async function saveDeck(params: {
     throw new Error("Add at least one flashcard before saving.");
   }
 
+  const plan = await fetchUserPlan(userId);
+  const limit = deckLimitForPlan(plan);
   const count = await countUserDecks();
-  if (count >= FREE_DECK_LIMIT) {
-    throw new Error(DECK_LIMIT_ERROR);
+  if (count >= limit) {
+    throw new Error(deckLimitExceededMessage(plan));
   }
 
   const title = params.title.trim() || "Untitled deck";
