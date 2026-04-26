@@ -6,13 +6,13 @@ import { useAuth } from "@/context/AuthContext";
 
 const freeFeatures = [
   "3 AI generations per day",
-  "1 file / image upload per day",
+  "3 file / image uploads per month",
   "Save up to 3 decks",
 ];
 
 const proFeatures = [
   "200 AI generations per month",
-  "50 file / image uploads per month",
+  "100 file / image uploads per month",
   "Save up to 10 decks",
   "Future premium tools",
 ];

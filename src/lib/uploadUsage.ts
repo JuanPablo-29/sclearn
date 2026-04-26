@@ -25,13 +25,13 @@ export async function assertUploadAllowed(): Promise<void> {
 
   if (plan === "pro") {
     throw new QuotaBlockedError(
-      "You've used your 50 uploads this month.",
+      "You've used your 100 uploads this month.",
       "upload",
       "pro"
     );
   }
   throw new QuotaBlockedError(
-    "You've used your free upload today.",
+    "You've used your 3 uploads this month. Upgrade to Pro for more access.",
     "upload",
     "free"
   );

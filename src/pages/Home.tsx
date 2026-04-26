@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { BillingHeaderActions } from "@/components/BillingHeaderActions";
 import { SaveDeckModal } from "@/components/SaveDeckModal";
 import { UpgradeModal } from "@/components/UpgradeModal";
+import { UploadInput } from "@/components/UploadInput";
 import { useAuth } from "@/context/AuthContext";
 import { trackEvent } from "@/lib/analytics";
 import { deckLimitForPlan } from "@/lib/decks";
@@ -56,6 +57,14 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleUploadedCards(cards: Flashcard[]) {
+    if (!user) {
+      throw new Error("Sign in to upload notes.");
+    }
+    await replaceUserFlashcards(supabase, user.id, cards);
+    setLastGeneratedCards(cards);
   }
 
   const canGenerate =
@@ -218,6 +227,14 @@ export default function Home() {
           <p className="text-xs text-zinc-500" aria-live="polite">
             {notes.length} characters · trimmed {notes.trim().length}
           </p>
+        </div>
+
+        <div className="mt-5">
+          <UploadInput
+            disabled={!user || authLoading || loading}
+            onCardsReady={handleUploadedCards}
+            onRequireUpgrade={() => setUpgradeOpen(true)}
+          />
         </div>
       </main>
 
