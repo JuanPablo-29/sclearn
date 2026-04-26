@@ -1,6 +1,9 @@
-import { Buffer } from "node:buffer";
-import pdf from "https://esm.sh/pdf-parse@1.1.1";
-import Tesseract from "https://esm.sh/tesseract.js@5";
+// Use jsDelivr-hosted builds: esm.sh re-bundling pulls optional native `canvas`,
+// which breaks Supabase Edge (Deno) deploy.
+import * as pdfjsLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/legacy/build/pdf.mjs";
+import Tesseract from "https://cdn.jsdelivr.net/npm/tesseract.js@5/+esm";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = undefined;
 
 function cleanText(text: string): string {
   return text
@@ -16,8 +19,19 @@ export async function parseFileToText(file: File): Promise<string> {
   // PDF extraction
   if (type === "application/pdf") {
     const buffer = await file.arrayBuffer();
-    const data = await pdf(Buffer.from(buffer));
-    return cleanText(data.text ?? "");
+    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+
+    let text = "";
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const strings = content.items
+        .map((item) => ("str" in item ? String(item.str ?? "") : ""))
+        .filter(Boolean);
+      text += strings.join(" ") + "\n";
+    }
+
+    return cleanText(text);
   }
 
   // OCR for images (typed and basic handwriting)
