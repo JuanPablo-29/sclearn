@@ -1,6 +1,5 @@
-// Use jsDelivr-hosted builds: esm.sh re-bundling pulls optional native `canvas`,
-// which breaks Supabase Edge (Deno) deploy.
-import * as pdfjsLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/legacy/build/pdf.mjs";
+// Use browser-only PDF.js build to avoid Node-only imports (`fs`) in Edge runtime.
+import * as pdfjsLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.mjs";
 import Tesseract from "https://cdn.jsdelivr.net/npm/tesseract.js@5/+esm";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = undefined;
