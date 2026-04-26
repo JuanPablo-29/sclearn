@@ -5,6 +5,7 @@ import { SaveDeckModal } from "@/components/SaveDeckModal";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { UploadInput } from "@/components/UploadInput";
 import { useAuth } from "@/context/AuthContext";
+import { useUsage } from "@/hooks/useUsage";
 import { trackEvent } from "@/lib/analytics";
 import { deckLimitForPlan } from "@/lib/decks";
 import { replaceUserFlashcards } from "@/lib/flashcardsDb";
@@ -16,6 +17,7 @@ import { supabase } from "@/lib/supabase";
 export default function Home() {
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut, billing } = useAuth();
+  const { usage, loading: usageLoading, refreshUsage } = useUsage();
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +43,7 @@ export default function Home() {
       await replaceUserFlashcards(supabase, user.id, cards);
       trackEvent("flashcards_generated", { card_count: cards.length });
       setLastGeneratedCards(cards);
+      await refreshUsage();
     } catch (e) {
       if (isQuotaBlockedError(e) && e.quotaKind === "generation") {
         if (e.plan === "free") {
@@ -65,6 +68,7 @@ export default function Home() {
     }
     await replaceUserFlashcards(supabase, user.id, cards);
     setLastGeneratedCards(cards);
+    await refreshUsage();
   }
 
   const canGenerate =
@@ -80,7 +84,10 @@ export default function Home() {
         open={saveModalOpen}
         onClose={() => setSaveModalOpen(false)}
         cards={lastGeneratedCards ?? []}
-        onSaved={() => setLastGeneratedCards(null)}
+        onSaved={() => {
+          setLastGeneratedCards(null);
+          void refreshUsage();
+        }}
         onDeckLimit={() => setUpgradeOpen(true)}
       />
 
@@ -227,11 +234,32 @@ export default function Home() {
           <p className="text-xs text-zinc-500" aria-live="polite">
             {notes.length} characters · trimmed {notes.trim().length}
           </p>
+          {user ? (
+            usageLoading ? (
+              <p className="text-xs text-zinc-500">Loading usage...</p>
+            ) : usage ? (
+              <div className="grid gap-1 text-xs text-zinc-400">
+                <p>
+                  Generations: {usage.generations.used} / {usage.generations.limit}{" "}
+                  today ({usage.generations.remaining} left)
+                </p>
+                <p>
+                  Uploads: {usage.uploads.used} / {usage.uploads.limit} this month{" "}
+                  ({usage.uploads.remaining} left)
+                </p>
+                <p>
+                  Decks: {usage.decks.used} / {usage.decks.limit} saved
+                </p>
+              </div>
+            ) : null
+          ) : null}
         </div>
 
         <div className="mt-5">
           <UploadInput
             disabled={!user || authLoading || loading}
+            usage={usage}
+            usageLoading={usageLoading}
             onCardsReady={handleUploadedCards}
             onRequireUpgrade={() => setUpgradeOpen(true)}
           />

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BillingHeaderActions } from "@/components/BillingHeaderActions";
 import { useAuth } from "@/context/AuthContext";
+import { useUsage } from "@/hooks/useUsage";
 import { trackEvent } from "@/lib/analytics";
 import {
   deckLimitForPlan,
@@ -95,6 +96,7 @@ function formatDate(iso: string): string {
 export default function Decks() {
   const navigate = useNavigate();
   const { user, loading: authLoading, billing } = useAuth();
+  const { usage, loading: usageLoading, refreshUsage } = useUsage();
   const deckCap = deckLimitForPlan(billing?.plan);
   const [decks, setDecks] = useState<SavedDeck[]>([]);
   const [loading, setLoading] = useState(true);
@@ -148,6 +150,7 @@ export default function Decks() {
       await deleteDeck(id);
       trackEvent("deck_deleted", { deck_id: id });
       setDecks((prev) => prev.filter((d) => d.id !== id));
+      await refreshUsage();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete deck");
     } finally {
@@ -370,6 +373,13 @@ export default function Decks() {
       </header>
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 sm:px-6">
+        {usageLoading ? (
+          <p className="mb-4 text-xs text-zinc-500">Loading usage...</p>
+        ) : usage ? (
+          <p className="mb-4 text-xs text-zinc-400">
+            {usage.decks.used} / {usage.decks.limit} decks used
+          </p>
+        ) : null}
         {error ? (
           <p
             className="mb-4 rounded-xl border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300"

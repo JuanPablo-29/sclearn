@@ -5,15 +5,24 @@ type UploadResult = {
   cards: Array<{ question: string; answer: string }>;
 };
 
+type UploadNotesOptions = {
+  onRequestStarted?: () => void;
+  onResponseReceived?: () => void;
+};
+
 function asObject(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
 }
 
-export async function uploadNotes(file: File): Promise<UploadResult> {
+export async function uploadNotes(
+  file: File,
+  options?: UploadNotesOptions
+): Promise<UploadResult> {
   const { supabaseUrl, headers } = await getAuthorizedEdgeInvokeHeaders();
   const formData = new FormData();
   formData.append("file", file);
 
+  options?.onRequestStarted?.();
   const res = await fetch(`${supabaseUrl}/functions/v1/upload-notes`, {
     method: "POST",
     headers: {
@@ -22,6 +31,7 @@ export async function uploadNotes(file: File): Promise<UploadResult> {
     },
     body: formData,
   });
+  options?.onResponseReceived?.();
 
   const text = await res.text();
   let parsed: unknown = null;
@@ -47,7 +57,9 @@ export async function uploadNotes(file: File): Promise<UploadResult> {
     if (res.status === 429 || code === "UPLOAD_LIMIT_REACHED") {
       throw new QuotaBlockedError(errorMessage, "upload", plan);
     }
-    throw new Error(errorMessage || "Upload failed");
+    const err = new Error(errorMessage || "Upload failed");
+    (err as Error & { code?: string }).code = code || undefined;
+    throw err;
   }
 
   if (!obj || !Array.isArray(obj.cards)) {

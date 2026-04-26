@@ -9,7 +9,7 @@ const corsHeaders: Record<string, string> = {
 
 const MAX_FILE_SIZE_BYTES = 5_000_000;
 const MAX_IMAGE_SIZE_BYTES = 3_000_000;
-const MAX_NOTES_LENGTH = 100_000;
+const MAX_EXTRACTION_CHARS = 12_000;
 const ALLOWED_TYPES = new Set([
   "image/png",
   "image/jpeg",
@@ -154,24 +154,40 @@ Deno.serve(async (req) => {
     });
   }
 
+  console.log("Upload type:", fileEntry.type);
+
   let extractedText: string;
   try {
-    extractedText = await parseFileToText(fileEntry);
-  } catch {
+    extractedText = await Promise.race([
+      parseFileToText(fileEntry),
+      new Promise<string>((_, reject) => {
+        setTimeout(() => reject(new Error("OCR_TIMEOUT")), 8000);
+      }),
+    ]);
+  } catch (err) {
+    if (err instanceof Error && err.message === "OCR_TIMEOUT") {
+      return json(408, {
+        error: "Processing took too long. Try a smaller or clearer file.",
+        code: "OCR_TIMEOUT",
+      });
+    }
     return json(400, {
       error: "Could not extract text from file",
       code: "PARSE_FAILED",
     });
   }
 
-  if (!extractedText || extractedText.length < 20) {
+  console.log("Extracted length:", extractedText?.length ?? 0);
+
+  const safeText = extractedText.slice(0, MAX_EXTRACTION_CHARS);
+  const wordCount = safeText.split(/\s+/).filter(Boolean).length;
+
+  if (!safeText || safeText.length < 20 || wordCount < 10) {
     return json(400, {
-      error: "Could not extract enough text from file",
-      code: "FAILED_TO_EXTRACT_TEXT",
+      error: "Not enough readable text found in file",
+      code: "LOW_QUALITY_TEXT",
     });
   }
-
-  const notes = extractedText.slice(0, MAX_NOTES_LENGTH);
 
   try {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -190,7 +206,7 @@ Deno.serve(async (req) => {
           },
           {
             role: "user",
-            content: `Convert the following notes into concise flashcards. Each flashcard should have a clear question and answer.\n\nNotes:\n${notes}`,
+            content: `Convert the following notes into concise flashcards. Each flashcard should have a clear question and answer.\n\nNotes:\n${safeText}`,
           },
         ],
         temperature: 0.3,
