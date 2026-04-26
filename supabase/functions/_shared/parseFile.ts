@@ -1,8 +1,5 @@
-// Use browser-only PDF.js build to avoid Node-only imports (`fs`) in Edge runtime.
-import * as pdfjsLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.mjs";
+import { resolvePDFJS } from "https://esm.sh/pdfjs-serverless@0.4.2";
 import Tesseract from "https://cdn.jsdelivr.net/npm/tesseract.js@5/+esm";
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = undefined;
 
 function cleanText(text: string): string {
   return text
@@ -18,7 +15,9 @@ export async function parseFileToText(file: File): Promise<string> {
   // PDF extraction
   if (type === "application/pdf") {
     const buffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+    const { getDocument, GlobalWorkerOptions } = await resolvePDFJS();
+    GlobalWorkerOptions.workerSrc = undefined;
+    const pdf = await getDocument({ data: new Uint8Array(buffer) }).promise;
 
     let text = "";
     for (let i = 1; i <= pdf.numPages; i++) {

@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState, type MouseEvent } from "react";
 import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -34,6 +34,7 @@ export function SaveDeckModal({
   const [title, setTitle] = useState(DEFAULT_DECK_TITLE);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const backdropMouseDownRef = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -70,13 +71,31 @@ export function SaveDeckModal({
     }
   }
 
+  function handleBackdropMouseDown(e: MouseEvent<HTMLDivElement>) {
+    backdropMouseDownRef.current = e.target === e.currentTarget;
+  }
+
+  function handleBackdropClick(e: MouseEvent<HTMLDivElement>) {
+    if (saving) return;
+    if (!backdropMouseDownRef.current) return;
+    if (e.target !== e.currentTarget) return;
+
+    const selection = window.getSelection();
+    if (selection && selection.toString().length > 0) {
+      return;
+    }
+
+    onClose();
+  }
+
   if (!open) return null;
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center"
       role="presentation"
-      onClick={() => !saving && onClose()}
+      onMouseDown={handleBackdropMouseDown}
+      onClick={handleBackdropClick}
     >
       <div
         role="dialog"
