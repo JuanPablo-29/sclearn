@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { parseFileToText } from "../_shared/parseFile.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -7,6 +8,7 @@ const corsHeaders: Record<string, string> = {
 };
 
 const MAX_FILE_SIZE_BYTES = 5_000_000;
+const MAX_IMAGE_SIZE_BYTES = 3_000_000;
 const MAX_NOTES_LENGTH = 100_000;
 const ALLOWED_TYPES = new Set([
   "image/png",
@@ -145,14 +147,31 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Baseline text extraction placeholder (OCR/PDF parsing can replace this later).
-  const rawText = (await fileEntry.text()).trim();
-  if (!rawText) {
+  if (fileEntry.type.startsWith("image/") && fileEntry.size > MAX_IMAGE_SIZE_BYTES) {
     return json(400, {
-      error: "Could not extract text from file. Try a clearer file.",
+      error: "Image file too large. Max image size is 3MB.",
+      code: "IMAGE_TOO_LARGE",
     });
   }
-  const notes = rawText.slice(0, MAX_NOTES_LENGTH);
+
+  let extractedText: string;
+  try {
+    extractedText = await parseFileToText(fileEntry);
+  } catch {
+    return json(400, {
+      error: "Could not extract text from file",
+      code: "PARSE_FAILED",
+    });
+  }
+
+  if (!extractedText || extractedText.length < 20) {
+    return json(400, {
+      error: "Could not extract enough text from file",
+      code: "FAILED_TO_EXTRACT_TEXT",
+    });
+  }
+
+  const notes = extractedText.slice(0, MAX_NOTES_LENGTH);
 
   try {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
