@@ -273,6 +273,38 @@ export async function getPublicDeckBySlug(
 }
 
 /**
+ * Duplicates a public shared deck into the signed-in user's decks.
+ * Reuses `saveDeck` so plan limits and validation stay centralized.
+ */
+export async function duplicatePublicDeckToUser(slug: string): Promise<SavedDeck> {
+  const trimmed = slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
+  if (!trimmed) {
+    throw new Error("Deck not found");
+  }
+
+  const { data, error } = await supabase.rpc("get_public_deck_by_slug", {
+    p_slug: trimmed,
+  });
+
+  if (error) throw new Error(error.message);
+  if (!data || typeof data !== "object") throw new Error("Deck not found");
+
+  const o = data as Record<string, unknown>;
+  const title = typeof o.title === "string" ? o.title.trim() : "";
+  const cards = parseCardsJson(o.cards);
+
+  if (!title || cards.length === 0) {
+    throw new Error("Deck not found");
+  }
+
+  return await saveDeck({
+    title,
+    cards,
+    description: "Saved from shared deck",
+  });
+}
+
+/**
  * Turn on public sharing. If `share_slug` was cleared only in DB by mistake,
  * generates a new slug; otherwise reuses slug and only sets `is_public`.
  * @returns Full URL to copy (e.g. `https://example.com/deck/biology-a8f3`)
