@@ -19,6 +19,41 @@ function userIdFromSubscription(sub: Stripe.Subscription): string | null {
   return typeof m === "string" && m.length > 0 ? m : null;
 }
 
+async function markReferralConverted(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+  context: string
+): Promise<void> {
+  const { data: profile, error: profileErr } = await admin
+    .from("profiles")
+    .select("referred_by")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (profileErr) {
+    console.error(`[${context}] referral lookup failed:`, profileErr);
+    return;
+  }
+
+  const referredBy = (profile as { referred_by?: string | null } | null)?.referred_by;
+  if (!referredBy) {
+    return;
+  }
+
+  const { error: updErr } = await admin
+    .from("referrals")
+    .update({
+      status: "converted",
+      converted_at: new Date().toISOString(),
+    })
+    .eq("referred_user_id", userId)
+    .eq("status", "pending");
+
+  if (updErr) {
+    console.error(`[${context}] referral conversion update failed:`, updErr);
+  }
+}
+
 async function syncProfileFromSubscription(
   admin: ReturnType<typeof createClient>,
   sub: Stripe.Subscription,
@@ -92,6 +127,9 @@ async function syncProfileFromSubscription(
     console.error(`[${context}] DB update error:`, error);
   } else {
     console.log(`[${context}] DB update success for userId:`, userId);
+    if (plan === "pro") {
+      await markReferralConverted(admin, userId, context);
+    }
   }
 }
 
@@ -260,6 +298,9 @@ Deno.serve(async (req) => {
           throw new Error(updErr.message);
         }
         console.log("DB update success for userId:", userId);
+        if (isPro) {
+          await markReferralConverted(admin, userId, "customer.subscription.updated");
+        }
         break;
       }
       case "customer.subscription.deleted": {

@@ -1,5 +1,8 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
 import { AuthProvider } from "@/context/AuthContext";
+import { captureReferralFromUrl } from "@/lib/referral";
+import AdminReferrals from "@/pages/AdminReferrals";
 import BillingSuccess from "@/pages/BillingSuccess";
 import Decks from "@/pages/Decks";
 import Home from "@/pages/Home";
@@ -8,11 +11,16 @@ import Learn from "@/pages/Learn";
 import Pricing from "@/pages/Pricing";
 import Login from "@/pages/Login";
 import Privacy from "@/pages/Privacy";
+import Referrals from "@/pages/Referrals";
 import Register from "@/pages/Register";
 import SharedDeck from "@/pages/SharedDeck";
 import Terms from "@/pages/Terms";
 
 export default function App() {
+  useEffect(() => {
+    captureReferralFromUrl();
+  }, []);
+
   return (
     <AuthProvider>
       <BrowserRouter>
@@ -28,6 +36,8 @@ export default function App() {
           <Route path="/terms" element={<Terms />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/billing/success" element={<BillingSuccess />} />
+          <Route path="/admin/referrals" element={<AdminReferrals />} />
+          <Route path="/referrals" element={<Referrals />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

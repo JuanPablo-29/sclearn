@@ -15,6 +15,7 @@ import {
   fetchUserBillingProfile,
   type UserBillingProfile,
 } from "@/lib/billing";
+import { consumeReferralCode } from "@/lib/referral";
 import { getSiteUrl, supabase } from "@/lib/supabase";
 
 type AuthContextValue = {
@@ -110,6 +111,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     void refreshBilling();
   }, [loading, authUserId, refreshBilling]);
+
+  useEffect(() => {
+    if (loading || !authUserId) return;
+    const referralCode = consumeReferralCode();
+    if (!referralCode) return;
+
+    void (async () => {
+      try {
+        await supabase.rpc("link_referrer_by_code", { p_code: referralCode });
+      } catch {
+        // No-op: referral linking is best-effort and should not block auth UX.
+      }
+    })();
+  }, [loading, authUserId]);
 
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
