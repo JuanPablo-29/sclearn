@@ -9,42 +9,54 @@ function cleanText(text: string): string {
     .trim();
 }
 
-export async function parseFileToText(file: File): Promise<string> {
-  const type = file.type;
+export async function parseFileToText(
+  file: File,
+  mimeType?: string
+): Promise<string> {
+  try {
+    const type = (mimeType ?? file.type).trim();
 
-  // PDF extraction
-  if (type === "application/pdf") {
-    const buffer = await file.arrayBuffer();
-    const { getDocument, GlobalWorkerOptions } = await resolvePDFJS();
-    GlobalWorkerOptions.workerSrc = undefined;
-    const pdf = await getDocument({ data: new Uint8Array(buffer) }).promise;
+    if (type === "application/pdf") {
+      const buffer = await file.arrayBuffer();
+      const { getDocument, GlobalWorkerOptions } = await resolvePDFJS();
+      GlobalWorkerOptions.workerSrc = undefined;
+      const pdf = await getDocument({ data: new Uint8Array(buffer) }).promise;
 
-    let text = "";
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      const strings = content.items
-        .map((item) => ("str" in item ? String(item.str ?? "") : ""))
-        .filter(Boolean);
-      text += strings.join(" ") + "\n";
+      let text = "";
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const strings = content.items
+          .map((item) => ("str" in item ? String(item.str ?? "") : ""))
+          .filter(Boolean);
+        text += strings.join(" ") + "\n";
+      }
+
+      return cleanText(text);
     }
 
-    return cleanText(text);
+    if (type.startsWith("image/")) {
+      try {
+        const result = await Tesseract.recognize(file, "eng", {
+          logger: () => {
+            // Keep edge logs clean for now.
+          },
+        });
+        const text = result?.data?.text || "";
+
+        console.log("OCR length:", text.length);
+
+        return cleanText(text);
+      } catch (err) {
+        console.error("OCR failed:", err);
+        return "";
+      }
+    }
+
+    console.error("parseFileToText: unsupported type", type);
+    return "";
+  } catch (err) {
+    console.error("parseFileToText failed:", err);
+    return "";
   }
-
-  // OCR for images (typed and basic handwriting)
-  if (type.startsWith("image/")) {
-    const buffer = await file.arrayBuffer();
-    const imageBytes = new Uint8Array(buffer);
-
-    const { data } = await Tesseract.recognize(imageBytes, "eng", {
-      logger: () => {
-        // Keep edge logs clean for now.
-      },
-    });
-
-    return cleanText(data.text ?? "");
-  }
-
-  throw new Error("Unsupported file type");
 }

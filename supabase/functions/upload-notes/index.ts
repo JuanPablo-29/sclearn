@@ -11,10 +11,49 @@ const MAX_FILE_SIZE_BYTES = 5_000_000;
 const MAX_IMAGE_SIZE_BYTES = 5_000_000;
 const MAX_EXTRACTION_CHARS = 12_000;
 const ALLOWED_TYPES = new Set([
+  "application/pdf",
   "image/png",
   "image/jpeg",
-  "application/pdf",
+  "image/webp",
+  "image/heic",
+  "image/heif",
 ]);
+
+function inferMimeFromFilename(name: string): string | null {
+  const lower = name.toLowerCase();
+  const dot = lower.lastIndexOf(".");
+  const ext = dot >= 0 ? lower.slice(dot) : "";
+  switch (ext) {
+    case ".pdf":
+      return "application/pdf";
+    case ".png":
+      return "image/png";
+    case ".jpg":
+    case ".jpeg":
+    case ".jpe":
+    case ".jfif":
+      return "image/jpeg";
+    case ".webp":
+      return "image/webp";
+    case ".heic":
+      return "image/heic";
+    case ".heif":
+      return "image/heif";
+    default:
+      return null;
+  }
+}
+
+/** Browsers on phones often omit `type` or send `application/octet-stream`. */
+function normalizeUploadMime(file: File): string {
+  let t = (file.type ?? "").trim().toLowerCase();
+  if (t === "image/jpg" || t === "image/pjpeg") t = "image/jpeg";
+  const inferred = inferMimeFromFilename(file.name ?? "");
+  if (!t || t === "application/octet-stream") {
+    return inferred ?? t;
+  }
+  return t;
+}
 
 type Flashcard = { question: string; answer: string };
 
@@ -135,9 +174,12 @@ Deno.serve(async (req) => {
     return json(400, { error: "file is required" });
   }
 
-  if (!ALLOWED_TYPES.has(fileEntry.type)) {
+  const effectiveMime = normalizeUploadMime(fileEntry);
+  if (!effectiveMime || !ALLOWED_TYPES.has(effectiveMime)) {
     return json(400, {
-      error: "Invalid file type. Allowed: PDF, PNG, JPEG.",
+      error:
+        "Invalid file type. Allowed: PDF, PNG, JPEG, WebP, HEIC.",
+      code: "INVALID_FILE_TYPE",
     });
   }
 
@@ -147,19 +189,26 @@ Deno.serve(async (req) => {
     });
   }
 
-  if (fileEntry.type.startsWith("image/") && fileEntry.size > MAX_IMAGE_SIZE_BYTES) {
+  if (
+    effectiveMime.startsWith("image/") &&
+    fileEntry.size > MAX_IMAGE_SIZE_BYTES
+  ) {
     return json(400, {
-      error: "Image file too large. Max image size is 5MB.",
+      error: "Image is too large. Try a smaller photo or screenshot.",
       code: "IMAGE_TOO_LARGE",
     });
   }
 
   console.log("Upload type:", fileEntry.type);
+  console.log("Upload size:", fileEntry.size);
+  if (effectiveMime.startsWith("image/")) {
+    console.log("Image size:", fileEntry.size);
+  }
 
   let extractedText: string;
   try {
     extractedText = await Promise.race([
-      parseFileToText(fileEntry),
+      parseFileToText(fileEntry, effectiveMime),
       new Promise<string>((_, reject) => {
         setTimeout(() => reject(new Error("OCR_TIMEOUT")), 8000);
       }),
@@ -167,27 +216,34 @@ Deno.serve(async (req) => {
   } catch (err) {
     if (err instanceof Error && err.message === "OCR_TIMEOUT") {
       return json(408, {
-        error: "Processing took too long. Try a smaller or clearer file.",
+        error:
+          "Processing took too long. Try a smaller or clearer file.",
         code: "OCR_TIMEOUT",
       });
     }
-    return json(400, {
-      error: "Could not extract text from file",
-      code: "PARSE_FAILED",
-    });
+    console.error("Parse error:", err);
+    extractedText = "";
   }
 
-  console.log("Extracted length:", extractedText?.length ?? 0);
+  console.log("OCR RAW TEXT:", extractedText?.slice(0, 500));
+  console.log("OCR LENGTH:", extractedText?.length || 0);
 
   const safeText = extractedText.slice(0, MAX_EXTRACTION_CHARS);
   const wordCount = safeText.split(/\s+/).filter(Boolean).length;
+  const isLowQuality =
+    safeText.length < 30 ||
+    wordCount < 8;
 
-  if (!safeText || safeText.length < 20 || wordCount < 10) {
+  if (isLowQuality) {
     return json(400, {
-      error: "Not enough readable text found in file",
-      code: "LOW_QUALITY_TEXT",
+      error:
+        "We couldn't read enough text from this image. Try a clearer photo, better lighting, or a screenshot.",
+      code: "LOW_QUALITY_IMAGE",
     });
   }
+
+  console.log("Final text used for AI:", safeText.slice(0, 300));
+  console.log("Word count:", wordCount);
 
   try {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {

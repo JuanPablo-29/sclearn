@@ -22,7 +22,49 @@ type UploadStatus =
   | null;
 
 const MAX_FILE_SIZE_BYTES = 5_000_000;
-const ACCEPTED_MIME = new Set(["image/png", "image/jpeg", "application/pdf"]);
+const ACCEPTED_MIME = new Set([
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+]);
+
+function inferMimeFromFilename(name: string): string | null {
+  const lower = name.toLowerCase();
+  const dot = lower.lastIndexOf(".");
+  const ext = dot >= 0 ? lower.slice(dot) : "";
+  switch (ext) {
+    case ".pdf":
+      return "application/pdf";
+    case ".png":
+      return "image/png";
+    case ".jpg":
+    case ".jpeg":
+    case ".jpe":
+    case ".jfif":
+      return "image/jpeg";
+    case ".webp":
+      return "image/webp";
+    case ".heic":
+      return "image/heic";
+    case ".heif":
+      return "image/heif";
+    default:
+      return null;
+  }
+}
+
+function normalizeClientUploadMime(file: File): string {
+  let t = (file.type ?? "").trim().toLowerCase();
+  if (t === "image/jpg" || t === "image/pjpeg") t = "image/jpeg";
+  const inferred = inferMimeFromFilename(file.name ?? "");
+  if (!t || t === "application/octet-stream") {
+    return inferred ?? t;
+  }
+  return t;
+}
 
 export function UploadInput({
   disabled = false,
@@ -46,13 +88,16 @@ export function UploadInput({
     const file = inputRef.current?.files?.[0];
     if (!file) {
       setStatus("error");
-      setError("Choose a PDF, PNG, or JPEG file first.");
+      setError("Choose a supported file first (PDF or image).");
       return;
     }
 
-    if (!ACCEPTED_MIME.has(file.type)) {
+    const effectiveMime = normalizeClientUploadMime(file);
+    if (!effectiveMime || !ACCEPTED_MIME.has(effectiveMime)) {
       setStatus("error");
-      setError("Invalid file type. Allowed: PDF, PNG, JPEG.");
+      setError(
+        "Invalid file type. Allowed: PDF, PNG, JPEG, WebP, or HEIC."
+      );
       return;
     }
     if (file.size <= 0 || file.size > MAX_FILE_SIZE_BYTES) {
@@ -64,7 +109,10 @@ export function UploadInput({
     setStatus("uploading");
     setError(null);
     setSuccess(null);
-    trackEvent("upload_started", { file_type: file.type, file_size: file.size });
+    trackEvent("upload_started", {
+      file_type: effectiveMime,
+      file_size: file.size,
+    });
 
     try {
       const { cards } = await uploadNotes(file, {
@@ -77,7 +125,7 @@ export function UploadInput({
       await onCardsReady(cards);
       trackEvent("upload_succeeded", {
         card_count: cards.length,
-        file_type: file.type,
+        file_type: effectiveMime,
       });
       setStatus("done");
       setSuccess("Flashcards ready!");
@@ -96,14 +144,7 @@ export function UploadInput({
           setError(e.message);
         }
       } else if (e instanceof Error) {
-        const code = (e as Error & { code?: string }).code;
-        if (code === "LOW_QUALITY_TEXT") {
-          setError("Could not read enough text. Try a clearer file.");
-        } else if (code === "OCR_TIMEOUT") {
-          setError("File took too long to process. Try a smaller file.");
-        } else {
-          setError(e.message || "Upload failed");
-        }
+        setError(e.message || "Upload failed");
       } else {
         setError("Upload failed");
       }
@@ -125,7 +166,7 @@ export function UploadInput({
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 sm:p-4">
       <p className="text-sm font-medium text-zinc-200">Upload notes file</p>
       <p className="mt-1 text-xs text-zinc-500">
-        PDF, PNG, or JPEG up to 5MB. We will convert it into flashcards.
+        PDF or common image formats (PNG, JPEG, WebP, HEIC) up to 5MB.
       </p>
       {usageLoading ? (
         <p className="mt-2 text-xs text-zinc-500">Loading usage...</p>
@@ -143,7 +184,7 @@ export function UploadInput({
         <input
           ref={inputRef}
           type="file"
-          accept=".pdf,image/png,image/jpeg"
+          accept="application/pdf,image/png,image/jpeg,image/webp,image/heic,image/heif,.pdf,.png,.jpg,.jpeg,.webp,.heic,.heif"
           disabled={disabled || busy || isUploadBlocked}
           onChange={(e) => {
             const file = e.currentTarget.files?.[0];
