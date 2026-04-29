@@ -8,7 +8,7 @@ const corsHeaders: Record<string, string> = {
 };
 
 const MAX_FILE_SIZE_BYTES = 5_000_000;
-const MAX_IMAGE_SIZE_BYTES = 3_000_000;
+const MAX_IMAGE_SIZE_BYTES = 5_000_000;
 const MAX_EXTRACTION_CHARS = 12_000;
 const ALLOWED_TYPES = new Set([
   "image/png",
@@ -149,7 +149,7 @@ Deno.serve(async (req) => {
 
   if (fileEntry.type.startsWith("image/") && fileEntry.size > MAX_IMAGE_SIZE_BYTES) {
     return json(400, {
-      error: "Image file too large. Max image size is 3MB.",
+      error: "Image file too large. Max image size is 5MB.",
       code: "IMAGE_TOO_LARGE",
     });
   }
