@@ -57,13 +57,6 @@ function getSupabasePublicClientKey(): string | undefined {
   );
 }
 
-/** Picks a card count from note length; always within [4, maxCards] (plan cap). */
-function computeAutoCardCount(notesLength: number, maxCards: number): number {
-  if (notesLength <= 0) return Math.min(4, maxCards);
-  const base = Math.ceil(notesLength / 400);
-  return Math.min(maxCards, Math.max(4, base + 2));
-}
-
 function paywallMessage(plan: string | undefined): { error: string; code: string } {
   if (plan === "pro") {
     return {
@@ -149,10 +142,8 @@ Deno.serve(async (req) => {
   }
 
   const autoCount = body.auto_count === true;
-  let requestedCount: number;
-  if (autoCount) {
-    requestedCount = computeAutoCardCount(notes.length, MAX_CARDS);
-  } else {
+  let manualRequestedCount: number | undefined;
+  if (!autoCount) {
     const countField = body.count;
     const parsedCount =
       typeof countField === "number" && Number.isFinite(countField)
@@ -170,7 +161,7 @@ Deno.serve(async (req) => {
         max_cards: MAX_CARDS,
       });
     }
-    requestedCount = Math.min(Math.max(parsedCount, 1), MAX_CARDS);
+    manualRequestedCount = Math.min(Math.max(parsedCount, 1), MAX_CARDS);
   }
 
   const { data: quotaData, error: quotaError } = await supabase.rpc(
@@ -197,6 +188,17 @@ Deno.serve(async (req) => {
   const planAfterReserve =
     typeof quota.plan === "string" ? quota.plan : "free";
 
+  const systemFlashcardRules =
+    'You convert study notes into flashcards. Respond with ONLY a valid JSON array of objects. Each object must have exactly two string keys: "question" and "answer". No markdown fences, no commentary, no extra keys.';
+
+  const systemContent = autoCount
+    ? `${systemFlashcardRules} The array must contain at most ${MAX_CARDS} objects; use fewer if the notes are short. Do not pad with low-value or duplicate cards.`
+    : systemFlashcardRules;
+
+  const userContent = autoCount
+    ? `From the notes below, create flashcards that cover the important concepts. Decide how many distinct cards the material naturally supports (no fixed count), but never more than ${MAX_CARDS} flashcards total. Each flashcard should have a clear question and answer.\n\nNotes:\n${notes}`
+    : `Generate exactly ${manualRequestedCount} flashcards from the following notes. Each flashcard should have a clear question and answer.\n\nNotes:\n${notes}`;
+
   try {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -209,12 +211,11 @@ Deno.serve(async (req) => {
         messages: [
           {
             role: "system",
-            content:
-              'You convert study notes into flashcards. Respond with ONLY a valid JSON array of objects. Each object must have exactly two string keys: "question" and "answer". No markdown fences, no commentary, no extra keys.',
+            content: systemContent,
           },
           {
             role: "user",
-            content: `Generate exactly ${requestedCount} flashcards from the following notes. Each flashcard should have a clear question and answer.\n\nNotes:\n${notes}`,
+            content: userContent,
           },
         ],
         temperature: 0.3,
@@ -259,7 +260,9 @@ Deno.serve(async (req) => {
       JSON.stringify({
         cards,
         plan: planAfterReserve,
-        requested_count: requestedCount,
+        requested_count: autoCount
+          ? cards.length
+          : (manualRequestedCount ?? cards.length),
         max_cards: MAX_CARDS,
         count_mode: autoCount ? "auto" : "manual",
       }),

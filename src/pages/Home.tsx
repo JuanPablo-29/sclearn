@@ -10,7 +10,6 @@ import { trackEvent } from "@/lib/analytics";
 import { deckLimitForPlan } from "@/lib/decks";
 import { replaceUserFlashcards } from "@/lib/flashcardsDb";
 import type { Flashcard } from "@/lib/flashcard";
-import { suggestedFlashcardCountFromNotesLength } from "@/lib/autoFlashcardCount";
 import { generateFlashcardsFromNotes } from "@/lib/generateFlashcardsApi";
 import { isQuotaBlockedError } from "@/lib/quotaErrors";
 import { supabase } from "@/lib/supabase";
@@ -262,7 +261,7 @@ export default function Home() {
                   onChange={() => setCountMode("auto")}
                   className="accent-emerald-500"
                 />
-                Choose for me
+                Let the AI decide how many
               </label>
               <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-300">
                 <input
@@ -278,15 +277,9 @@ export default function Home() {
             </fieldset>
             {countMode === "auto" ? (
               <p className="mt-2 text-xs text-zinc-400">
-                We estimate about{" "}
-                <span className="font-medium text-zinc-200">
-                  {suggestedFlashcardCountFromNotesLength(
-                    notes.trim().length,
-                    maxCards
-                  )}
-                </span>{" "}
-                flashcards from your notes (never more than {maxCards} on your
-                plan). The final count is chosen when you generate.
+                The model chooses how many flashcards fit your notes (no fixed
+                count). Your plan still caps each run at {maxCards} cards
+                maximum.
               </p>
             ) : (
               <>
