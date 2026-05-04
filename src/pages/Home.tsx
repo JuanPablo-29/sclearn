@@ -10,6 +10,7 @@ import { trackEvent } from "@/lib/analytics";
 import { deckLimitForPlan } from "@/lib/decks";
 import { replaceUserFlashcards } from "@/lib/flashcardsDb";
 import type { Flashcard } from "@/lib/flashcard";
+import { suggestedFlashcardCountFromNotesLength } from "@/lib/autoFlashcardCount";
 import { generateFlashcardsFromNotes } from "@/lib/generateFlashcardsApi";
 import { isQuotaBlockedError } from "@/lib/quotaErrors";
 import { supabase } from "@/lib/supabase";
@@ -22,6 +23,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [count, setCount] = useState(10);
+  const [countMode, setCountMode] = useState<"manual" | "auto">("auto");
   const [lastGeneratedCards, setLastGeneratedCards] = useState<
     Flashcard[] | null
   >(null);
@@ -42,12 +44,20 @@ export default function Home() {
     setLoading(true);
     setLastGeneratedCards(null);
     try {
-      const cards = await generateFlashcardsFromNotes(trimmed, Math.min(count, maxCards));
+      const cards = await generateFlashcardsFromNotes(
+        trimmed,
+        countMode === "auto"
+          ? { autoCount: true }
+          : { count: Math.min(count, maxCards) }
+      );
       if (cards.length === 0) {
         throw new Error("No flashcards returned");
       }
       await replaceUserFlashcards(supabase, user.id, cards);
-      trackEvent("flashcards_generated", { card_count: cards.length });
+      trackEvent("flashcards_generated", {
+        card_count: cards.length,
+        count_mode: countMode,
+      });
       setLastGeneratedCards(cards);
       await refreshUsage();
     } catch (e) {
@@ -241,44 +251,93 @@ export default function Home() {
             {notes.length} characters · trimmed {notes.trim().length}
           </p>
           <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
-            <label htmlFor="card-count" className="text-sm font-medium text-zinc-300">
-              Flashcards to generate
-            </label>
-            <div className="mt-2 flex items-center gap-3">
-              <input
-                id="card-count"
-                type="range"
-                min={1}
-                max={maxCards}
-                step={1}
-                value={count}
-                disabled={!user || authLoading || loading}
-                onChange={(e) =>
-                  setCount(
-                    Math.min(Math.max(Number(e.currentTarget.value) || 1, 1), maxCards)
-                  )
-                }
-                className="w-full accent-emerald-500 disabled:opacity-50"
-              />
-              <input
-                type="number"
-                min={1}
-                max={maxCards}
-                value={count}
-                disabled={!user || authLoading || loading}
-                onChange={(e) => {
-                  const input = Number(e.currentTarget.value) || 1;
-                  setCount(Math.min(Math.max(input, 1), maxCards));
-                }}
-                className="w-20 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm text-zinc-200 disabled:opacity-50"
-              />
-            </div>
+            <p className="text-sm font-medium text-zinc-300">Flashcard amount</p>
+            <fieldset className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-300">
+                <input
+                  type="radio"
+                  name="count-mode"
+                  checked={countMode === "auto"}
+                  disabled={!user || authLoading || loading}
+                  onChange={() => setCountMode("auto")}
+                  className="accent-emerald-500"
+                />
+                Choose for me
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-300">
+                <input
+                  type="radio"
+                  name="count-mode"
+                  checked={countMode === "manual"}
+                  disabled={!user || authLoading || loading}
+                  onChange={() => setCountMode("manual")}
+                  className="accent-emerald-500"
+                />
+                I will pick a number
+              </label>
+            </fieldset>
+            {countMode === "auto" ? (
+              <p className="mt-2 text-xs text-zinc-400">
+                We estimate about{" "}
+                <span className="font-medium text-zinc-200">
+                  {suggestedFlashcardCountFromNotesLength(
+                    notes.trim().length,
+                    maxCards
+                  )}
+                </span>{" "}
+                flashcards from your notes (never more than {maxCards} on your
+                plan). The final count is chosen when you generate.
+              </p>
+            ) : (
+              <>
+                <label
+                  htmlFor="card-count"
+                  className="mt-2 block text-xs font-medium text-zinc-500"
+                >
+                  Number of flashcards
+                </label>
+                <div className="mt-1 flex items-center gap-3">
+                  <input
+                    id="card-count"
+                    type="range"
+                    min={1}
+                    max={maxCards}
+                    step={1}
+                    value={count}
+                    disabled={!user || authLoading || loading}
+                    onChange={(e) =>
+                      setCount(
+                        Math.min(
+                          Math.max(Number(e.currentTarget.value) || 1, 1),
+                          maxCards
+                        )
+                      )
+                    }
+                    className="w-full accent-emerald-500 disabled:opacity-50"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    max={maxCards}
+                    value={count}
+                    disabled={!user || authLoading || loading}
+                    onChange={(e) => {
+                      const input = Number(e.currentTarget.value) || 1;
+                      setCount(Math.min(Math.max(input, 1), maxCards));
+                    }}
+                    className="w-20 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm text-zinc-200 disabled:opacity-50"
+                  />
+                </div>
+              </>
+            )}
             <p className="mt-2 text-xs text-zinc-500">
               {billing?.plan === "pro"
                 ? "You can generate up to 50 flashcards per set."
                 : "You can generate up to 10 flashcards per set."}
             </p>
-            {billing?.plan !== "pro" && count >= 10 ? (
+            {billing?.plan !== "pro" &&
+            countMode === "manual" &&
+            count >= maxCards ? (
               <p className="mt-1 text-xs text-emerald-300">
                 Upgrade to Pro to generate up to 50 flashcards at once.
               </p>

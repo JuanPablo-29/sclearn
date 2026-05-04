@@ -57,6 +57,13 @@ function getSupabasePublicClientKey(): string | undefined {
   );
 }
 
+/** Picks a card count from note length; always within [4, maxCards] (plan cap). */
+function computeAutoCardCount(notesLength: number, maxCards: number): number {
+  if (notesLength <= 0) return Math.min(4, maxCards);
+  const base = Math.ceil(notesLength / 400);
+  return Math.min(maxCards, Math.max(4, base + 2));
+}
+
 function paywallMessage(plan: string | undefined): { error: string; code: string } {
   if (plan === "pro") {
     return {
@@ -127,28 +134,10 @@ Deno.serve(async (req) => {
     return json(400, { error: "Invalid request body" });
   }
 
-  const notesField = (rawBody as Record<string, unknown>).notes;
+  const body = rawBody as Record<string, unknown>;
+  const notesField = body.notes;
   if (typeof notesField !== "string") {
     return json(400, { error: "Invalid request body" });
-  }
-
-  const countField = (rawBody as Record<string, unknown>).count;
-  const parsedCount =
-    typeof countField === "number" && Number.isFinite(countField)
-      ? Math.floor(countField)
-      : 10;
-  const requestedCount = Math.min(Math.max(parsedCount, 1), MAX_CARDS);
-
-  if (parsedCount > MAX_CARDS) {
-    return json(400, {
-      error:
-        plan === "pro"
-          ? "Max 50 flashcards per generation."
-          : "Free plan allows up to 10 flashcards.",
-      code: "FLASHCARD_LIMIT_EXCEEDED",
-      plan,
-      max_cards: MAX_CARDS,
-    });
   }
 
   const notes = notesField.trim();
@@ -157,6 +146,31 @@ Deno.serve(async (req) => {
   }
   if (notes.length > MAX_NOTES_LENGTH) {
     return json(400, { error: "notes exceed maximum allowed length" });
+  }
+
+  const autoCount = body.auto_count === true;
+  let requestedCount: number;
+  if (autoCount) {
+    requestedCount = computeAutoCardCount(notes.length, MAX_CARDS);
+  } else {
+    const countField = body.count;
+    const parsedCount =
+      typeof countField === "number" && Number.isFinite(countField)
+        ? Math.floor(countField)
+        : 10;
+
+    if (parsedCount > MAX_CARDS) {
+      return json(400, {
+        error:
+          plan === "pro"
+            ? "Max 50 flashcards per generation."
+            : "Free plan allows up to 10 flashcards.",
+        code: "FLASHCARD_LIMIT_EXCEEDED",
+        plan,
+        max_cards: MAX_CARDS,
+      });
+    }
+    requestedCount = Math.min(Math.max(parsedCount, 1), MAX_CARDS);
   }
 
   const { data: quotaData, error: quotaError } = await supabase.rpc(
@@ -247,6 +261,7 @@ Deno.serve(async (req) => {
         plan: planAfterReserve,
         requested_count: requestedCount,
         max_cards: MAX_CARDS,
+        count_mode: autoCount ? "auto" : "manual",
       }),
       {
       status: 200,

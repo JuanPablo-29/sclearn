@@ -18,21 +18,37 @@ function parseErrorMessage(text: string, result: unknown): string {
   return text.slice(0, 200).trim() || "Request failed";
 }
 
+export type GenerateFlashcardsOptions = {
+  /** Exact count (clamped server-side to plan max). Ignored when `autoCount` is true. */
+  count?: number;
+  /** Server picks a count from note length, capped by plan (free 10 / pro 50). */
+  autoCount?: boolean;
+};
+
 /**
  * Calls the Edge Function with `apikey` (publishable) and `Authorization: Bearer <access_token>`.
  * Auth is enforced inside the function via `getUser` (gateway JWT verification off).
  */
 export async function generateFlashcardsFromNotes(
   notes: string,
-  count = 10
+  options: number | GenerateFlashcardsOptions = 10
 ): Promise<Flashcard[]> {
   const { supabaseUrl, headers } = await getAuthorizedEdgeInvokeHeaders();
   const url = `${supabaseUrl}/functions/v1/generate-flashcards`;
 
+  let body: Record<string, unknown>;
+  if (typeof options === "number") {
+    body = { notes, count: options };
+  } else if (options?.autoCount) {
+    body = { notes, auto_count: true };
+  } else {
+    body = { notes, count: options?.count ?? 10 };
+  }
+
   const response = await globalThis.fetch(url, {
     method: "POST",
     headers,
-    body: JSON.stringify({ notes, count }),
+    body: JSON.stringify(body),
   });
 
   const text = await response.text();
