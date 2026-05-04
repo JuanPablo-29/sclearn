@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BillingHeaderActions } from "@/components/BillingHeaderActions";
+import UsageBar from "@/components/UsageBar";
 import { useAuth } from "@/context/AuthContext";
 import { useUsage } from "@/hooks/useUsage";
 import { trackEvent } from "@/lib/analytics";
@@ -98,6 +99,8 @@ export default function Decks() {
   const { user, loading: authLoading, billing } = useAuth();
   const { usage, loading: usageLoading, refreshUsage } = useUsage();
   const deckCap = deckLimitForPlan(billing?.plan);
+  const deckLimitDisplay =
+    usage && usage.decks.limit >= 1000 ? null : usage?.decks.limit ?? null;
   const [decks, setDecks] = useState<SavedDeck[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -373,13 +376,22 @@ export default function Decks() {
       </header>
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 sm:px-6">
-        {usageLoading ? (
-          <p className="mb-4 text-xs text-zinc-500">Loading usage...</p>
-        ) : usage ? (
-          <p className="mb-4 text-xs text-zinc-400">
-            {usage.decks.used} / {usage.decks.limit} decks used
-          </p>
-        ) : null}
+        <div className="mb-4 space-y-2">
+          {usageLoading ? (
+            <p className="text-xs text-zinc-500">Loading usage...</p>
+          ) : usage ? (
+            <UsageBar
+              label="Decks saved"
+              used={usage.decks.used}
+              limit={deckLimitDisplay}
+            />
+          ) : null}
+          {usage && usage.decks.remaining === 0 ? (
+            <p className="text-xs text-red-400">
+              Limit reached. Upgrade to continue.
+            </p>
+          ) : null}
+        </div>
         {error ? (
           <p
             className="mb-4 rounded-xl border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300"

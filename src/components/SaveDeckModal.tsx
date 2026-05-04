@@ -7,6 +7,7 @@ import {
   saveDeck,
 } from "@/lib/decks";
 import type { Flashcard } from "@/lib/flashcard";
+import UsageBar from "@/components/UsageBar";
 
 export const DEFAULT_DECK_TITLE = "Biology Notes";
 
@@ -19,6 +20,7 @@ type SaveDeckModalProps = {
   onSaved?: () => void;
   /** Free-tier deck cap — show upgrade modal from parent. */
   onDeckLimit?: () => void;
+  deckUsage?: { used: number; limit: number; remaining: number } | null;
 };
 
 export function SaveDeckModal({
@@ -27,10 +29,13 @@ export function SaveDeckModal({
   cards,
   onSaved,
   onDeckLimit,
+  deckUsage = null,
 }: SaveDeckModalProps) {
   const titleId = useId();
   const { billing } = useAuth();
   const deckCap = deckLimitForPlan(billing?.plan);
+  const deckLimitDisplay =
+    deckUsage && deckUsage.limit >= 1000 ? null : deckUsage?.limit ?? null;
   const [title, setTitle] = useState(DEFAULT_DECK_TITLE);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -113,6 +118,20 @@ export function SaveDeckModal({
         <p className="mt-1 text-sm text-zinc-500">
           Choose a title (up to {deckCap} saved decks on your current plan).
         </p>
+        {deckUsage ? (
+          <div className="mt-3 space-y-2">
+            <UsageBar
+              label="Decks saved"
+              used={deckUsage.used}
+              limit={deckLimitDisplay}
+            />
+            {deckUsage.remaining === 0 ? (
+              <p className="text-xs text-red-400">
+                Limit reached. Upgrade to continue.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         <label
           htmlFor={`${titleId}-input`}
           className="mt-4 block text-sm font-medium text-zinc-300"

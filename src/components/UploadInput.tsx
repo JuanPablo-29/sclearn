@@ -4,6 +4,7 @@ import type { Flashcard } from "@/lib/flashcard";
 import { isQuotaBlockedError } from "@/lib/quotaErrors";
 import { uploadNotes } from "@/lib/uploadApi";
 import type { UsageSummary } from "@/lib/usage";
+import UsageBar from "@/components/UsageBar";
 
 type UploadInputProps = {
   disabled?: boolean;
@@ -82,6 +83,8 @@ export function UploadInput({
     status !== null && status !== "done" && status !== "error";
   const uploadsRemaining = usage?.uploads.remaining ?? 0;
   const isUploadBlocked = Boolean(usage && uploadsRemaining <= 0);
+  const uploadLimitDisplay =
+    usage && usage.uploads.limit >= 1000 ? null : usage?.uploads.limit ?? null;
 
   async function handleUploadClick() {
     if (disabled || busy || isUploadBlocked) return;
@@ -168,18 +171,22 @@ export function UploadInput({
       <p className="mt-1 text-xs text-zinc-500">
         PDF or common image formats (PNG, JPEG, WebP, HEIC) up to 5MB.
       </p>
-      {usageLoading ? (
-        <p className="mt-2 text-xs text-zinc-500">Loading usage...</p>
-      ) : usage ? (
-        <p className="mt-2 text-xs text-zinc-400">
-          You have {uploadsRemaining} uploads left this month.
-        </p>
-      ) : null}
-      {isUploadBlocked ? (
-        <p className="mt-1 text-xs text-emerald-300">
-          You reached your upload limit this month. Upgrade to Pro for more.
-        </p>
-      ) : null}
+      <div className="mt-3 space-y-2">
+        {usageLoading ? (
+          <p className="text-xs text-zinc-500">Loading usage...</p>
+        ) : usage ? (
+          <UsageBar
+            label="Uploads this month"
+            used={usage.uploads.used}
+            limit={uploadLimitDisplay}
+          />
+        ) : null}
+        {isUploadBlocked ? (
+          <p className="text-xs text-red-400">
+            Limit reached. Upgrade to continue.
+          </p>
+        ) : null}
+      </div>
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
         <input
           ref={inputRef}

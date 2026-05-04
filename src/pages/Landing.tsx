@@ -6,18 +6,6 @@ import { Hero } from "@/components/landing/Hero";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { trackEvent } from "@/lib/analytics";
 
-const scrollDemoBullets = [
-  "• Swipe through flashcards effortlessly",
-  "• Tap to reveal answers instantly",
-  "• Study longer without losing focus",
-];
-
-const whyScrollingPoints = [
-  "• Bite-sized information improves retention",
-  "• Continuous scrolling keeps your brain engaged",
-  "• Instant feedback strengthens memory",
-];
-
 export default function Landing() {
   const handleStartClick = () => {
     trackEvent("landing_cta_clicked");
@@ -68,46 +56,7 @@ export default function Landing() {
       <main>
         <Hero onAppCtaClick={handleStartClick} />
 
-        <section className="border-b border-zinc-800/80 py-16 sm:py-20">
-          <div className="mx-auto max-w-3xl space-y-4 px-6 text-center">
-            <h2 className="text-2xl font-bold tracking-tight text-zinc-100 sm:text-3xl">
-              Learning That Feels Like Scrolling
-            </h2>
-            <p className="text-pretty text-base leading-relaxed text-zinc-400 sm:text-lg">
-              Instead of flipping through boring flashcards, Sclearn lets you
-              study by scrolling through concepts. Each swipe reveals a new idea,
-              making studying feel fast, engaging, and addictive.
-            </p>
-            <ul className="mx-auto max-w-md space-y-3 pt-2 text-left text-sm text-zinc-300 sm:text-base">
-              {scrollDemoBullets.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          </div>
-        </section>
-
         <Features />
-
-        <section className="border-b border-zinc-800/80 py-16 sm:py-20">
-          <div className="mx-auto max-w-6xl px-6">
-            <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-100 sm:text-3xl">
-              Why Scrolling Works for Learning
-            </h2>
-            <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-3">
-              {whyScrollingPoints.map((point) => (
-                <div
-                  key={point}
-                  className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 px-5 py-6 text-center"
-                >
-                  <p className="text-sm leading-relaxed text-zinc-300 sm:text-base">
-                    {point}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
         <HowItWorks />
         <CTA onAppCtaClick={handleStartClick} />
       </main>

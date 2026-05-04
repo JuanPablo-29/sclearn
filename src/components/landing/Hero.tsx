@@ -25,15 +25,13 @@ export function Hero({ onAppCtaClick }: HeroProps) {
 
         <div className="mx-auto max-w-3xl text-center">
           <div className="space-y-6">
-            <p className="font-medium text-emerald-400">
-              Scroll + Learn = Sclearn
-            </p>
+            <p className="font-medium text-emerald-400">AI study, built for real notes</p>
             <h1 className="text-balance text-4xl font-bold tracking-tight text-zinc-100 sm:text-5xl md:text-6xl">
-              Turn Your Notes Into Addictive Study Scrolls
+              Turn Notes Into Flashcards Instantly
             </h1>
             <p className="mx-auto max-w-xl text-pretty text-base text-zinc-400 sm:text-lg">
-              Paste notes or enter any subject and instantly turn it into an
-              addictive scroll-based study experience.
+              Paste notes, upload PDFs, or snap a photo. Get clean, study-ready
+              flashcards in seconds.
             </p>
           </div>
 
@@ -43,15 +41,20 @@ export function Hero({ onAppCtaClick }: HeroProps) {
               onClick={onAppCtaClick}
               className="inline-flex min-h-[48px] touch-manipulation items-center justify-center rounded-xl bg-emerald-500 px-8 py-3.5 text-center text-base font-semibold text-zinc-950 shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-400 sm:min-h-[44px]"
             >
-              Start Scrolling to Learn
+              Start Studying Free
             </Link>
             <Link
-              to="/login"
+              to="/learn"
+              onClick={onAppCtaClick}
               className="inline-flex min-h-[44px] touch-manipulation items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900/50 px-6 py-3 text-center text-sm font-medium text-zinc-100 transition hover:border-zinc-600 hover:bg-zinc-800/80"
             >
-              Sign In
+              Try with a sample
             </Link>
           </div>
+          <p className="mt-3 text-xs text-zinc-500">
+            Free plan includes daily generations and uploads. Upgrade anytime for
+            more.
+          </p>
         </div>
 
         <div className="mx-auto mt-14 max-w-md sm:mt-16">

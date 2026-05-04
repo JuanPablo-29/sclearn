@@ -4,6 +4,7 @@ import { BillingHeaderActions } from "@/components/BillingHeaderActions";
 import { SaveDeckModal } from "@/components/SaveDeckModal";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { UploadInput } from "@/components/UploadInput";
+import UsageBar from "@/components/UsageBar";
 import { useAuth } from "@/context/AuthContext";
 import { useUsage } from "@/hooks/useUsage";
 import { trackEvent } from "@/lib/analytics";
@@ -86,8 +87,17 @@ export default function Home() {
     await refreshUsage();
   }
 
+  const generationLimitDisplay =
+    usage && usage.generations.limit >= 1000 ? null : usage?.generations.limit ?? null;
+  const deckLimitDisplay =
+    usage && usage.decks.limit >= 1000 ? null : usage?.decks.limit ?? null;
+  const isGenerationBlocked = Boolean(usage && usage.generations.remaining <= 0);
   const canGenerate =
-    Boolean(user) && notes.trim().length > 0 && !loading && !authLoading;
+    Boolean(user) &&
+    notes.trim().length > 0 &&
+    !loading &&
+    !authLoading &&
+    !isGenerationBlocked;
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-zinc-950 text-zinc-100">
@@ -99,6 +109,7 @@ export default function Home() {
         open={saveModalOpen}
         onClose={() => setSaveModalOpen(false)}
         cards={lastGeneratedCards ?? []}
+        deckUsage={usage?.decks ?? null}
         onSaved={() => {
           setLastGeneratedCards(null);
           void refreshUsage();
@@ -209,6 +220,20 @@ export default function Home() {
               Study now and save later from the study screen, or save this run
               here (up to {deckCap} saved decks on your plan).
             </p>
+            {usage ? (
+              <div className="mt-3">
+                <UsageBar
+                  label="Decks saved"
+                  used={usage.decks.used}
+                  limit={deckLimitDisplay}
+                />
+                {usage.decks.remaining === 0 ? (
+                  <p className="mt-1 text-xs text-red-400">
+                    Limit reached. Upgrade to continue.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               <button
                 type="button"
@@ -228,7 +253,7 @@ export default function Home() {
           </div>
         ) : null}
 
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-4">
           <label htmlFor="notes" className="text-sm font-medium text-zinc-300">
             Paste notes or enter a subject
           </label>
@@ -336,25 +361,6 @@ export default function Home() {
               </p>
             ) : null}
           </div>
-          {user ? (
-            usageLoading ? (
-              <p className="text-xs text-zinc-500">Loading usage...</p>
-            ) : usage ? (
-              <div className="grid gap-1 text-xs text-zinc-400">
-                <p>
-                  Generations: {usage.generations.used} / {usage.generations.limit}{" "}
-                  today ({usage.generations.remaining} left)
-                </p>
-                <p>
-                  Uploads: {usage.uploads.used} / {usage.uploads.limit} this month{" "}
-                  ({usage.uploads.remaining} left)
-                </p>
-                <p>
-                  Decks: {usage.decks.used} / {usage.decks.limit} saved
-                </p>
-              </div>
-            ) : null
-          ) : null}
         </div>
 
         <div className="mt-5">
@@ -379,6 +385,27 @@ export default function Home() {
 
       <footer className="mt-auto w-full shrink-0 border-t border-zinc-800 bg-zinc-950">
         <div className="mx-auto w-full max-w-2xl px-4 py-3 pb-safe sm:px-6">
+          <div className="space-y-2">
+            {usageLoading ? (
+              <p className="text-xs text-zinc-500">Loading usage...</p>
+            ) : usage ? (
+              <UsageBar
+                label="Flashcards today"
+                used={usage.generations.used}
+                limit={generationLimitDisplay}
+              />
+            ) : null}
+            <p className="text-xs text-zinc-500">
+              {billing?.plan === "pro"
+                ? "Up to 50 cards per set"
+                : "Free plan: up to 10 cards per set"}
+            </p>
+            {isGenerationBlocked ? (
+              <p className="text-xs text-red-400">
+                Limit reached. Upgrade to continue.
+              </p>
+            ) : null}
+          </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
             <button
               type="button"

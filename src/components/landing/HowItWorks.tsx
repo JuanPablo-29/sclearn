@@ -1,21 +1,21 @@
 const steps = [
   {
     n: 1,
-    title: "Paste your notes",
+    title: "Add your content",
     description:
-      "Add your lecture notes, readings, or any text — Sclearn uses it as the source for your deck.",
+      "Paste notes, upload a file, or type a topic.",
   },
   {
     n: 2,
-    title: "Generate flashcards with AI",
+    title: "Generate flashcards",
     description:
-      "AI turns your content into clear questions and answers you can study right away.",
+      "AI turns your content into clean flashcards.",
   },
   {
     n: 3,
-    title: "Scroll and learn",
+    title: "Study and retain",
     description:
-      "Swipe through flashcards and tap to reveal answers, making studying feel natural and engaging.",
+      "Scroll, flip, and learn faster.",
   },
 ];
 
@@ -24,7 +24,7 @@ export function HowItWorks() {
     <section className="border-b border-zinc-800/80 py-16 sm:py-20">
       <div className="mx-auto max-w-6xl px-6">
         <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-100 sm:text-3xl">
-          How It Works
+          How it works
         </h2>
         <div className="mt-12 flex flex-col gap-8 md:flex-row md:items-start md:justify-center md:gap-6 lg:gap-10">
           {steps.map((step) => (

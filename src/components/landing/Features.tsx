@@ -1,15 +1,27 @@
 const items = [
   {
-    title: "AI Flashcard Generation",
-    body: "Paste your notes and instantly generate flashcards powered by AI.",
+    title: "Paste or Type Notes",
+    body: "Drop in your notes or enter any topic and generate flashcards instantly.",
   },
   {
-    title: "Addictive Scroll Learning",
-    body: "Study using a swipe-based interface inspired by social media feeds.",
+    title: "Upload PDFs & Images",
+    body: "Upload lecture slides, worksheets, or photos of notes. AI extracts key concepts automatically.",
   },
   {
-    title: "Learn Faster",
-    body: "Scrolling through bite-sized questions helps you stay focused and retain more information.",
+    title: "Smart Flashcard Generation",
+    body: "Clear, concise flashcards designed for retention, not fluff.",
+  },
+  {
+    title: "Track Your Usage",
+    body: "See how many generations, uploads, and decks you have left in real time.",
+  },
+  {
+    title: "Scroll-Based Learning",
+    body: "Study faster with a clean, swipe-style flashcard experience.",
+  },
+  {
+    title: "Save & Organize Decks",
+    body: "Keep your flashcards organized and revisit them anytime.",
   },
 ];
 
@@ -18,7 +30,7 @@ export function Features() {
     <section className="border-b border-zinc-800/80 py-16 sm:py-20">
       <div className="mx-auto max-w-6xl px-6">
         <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-100 sm:text-3xl">
-          Why Students Use Sclearn
+          Everything you need to study faster
         </h2>
         <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => (
