@@ -23,7 +23,8 @@ function parseErrorMessage(text: string, result: unknown): string {
  * Auth is enforced inside the function via `getUser` (gateway JWT verification off).
  */
 export async function generateFlashcardsFromNotes(
-  notes: string
+  notes: string,
+  count = 10
 ): Promise<Flashcard[]> {
   const { supabaseUrl, headers } = await getAuthorizedEdgeInvokeHeaders();
   const url = `${supabaseUrl}/functions/v1/generate-flashcards`;
@@ -31,7 +32,7 @@ export async function generateFlashcardsFromNotes(
   const response = await globalThis.fetch(url, {
     method: "POST",
     headers,
-    body: JSON.stringify({ notes }),
+    body: JSON.stringify({ notes, count }),
   });
 
   const text = await response.text();

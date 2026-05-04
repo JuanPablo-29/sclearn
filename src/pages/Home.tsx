@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BillingHeaderActions } from "@/components/BillingHeaderActions";
 import { SaveDeckModal } from "@/components/SaveDeckModal";
@@ -21,12 +21,18 @@ export default function Home() {
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [count, setCount] = useState(10);
   const [lastGeneratedCards, setLastGeneratedCards] = useState<
     Flashcard[] | null
   >(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const deckCap = deckLimitForPlan(billing?.plan);
+  const maxCards = billing?.plan === "pro" ? 50 : 10;
+
+  useEffect(() => {
+    setCount((prev) => Math.min(Math.max(prev, 1), maxCards));
+  }, [maxCards]);
 
   async function handleGenerate() {
     if (!user) return;
@@ -36,7 +42,7 @@ export default function Home() {
     setLoading(true);
     setLastGeneratedCards(null);
     try {
-      const cards = await generateFlashcardsFromNotes(trimmed);
+      const cards = await generateFlashcardsFromNotes(trimmed, Math.min(count, maxCards));
       if (cards.length === 0) {
         throw new Error("No flashcards returned");
       }
@@ -234,6 +240,50 @@ export default function Home() {
           <p className="text-xs text-zinc-500" aria-live="polite">
             {notes.length} characters · trimmed {notes.trim().length}
           </p>
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
+            <label htmlFor="card-count" className="text-sm font-medium text-zinc-300">
+              Flashcards to generate
+            </label>
+            <div className="mt-2 flex items-center gap-3">
+              <input
+                id="card-count"
+                type="range"
+                min={1}
+                max={maxCards}
+                step={1}
+                value={count}
+                disabled={!user || authLoading || loading}
+                onChange={(e) =>
+                  setCount(
+                    Math.min(Math.max(Number(e.currentTarget.value) || 1, 1), maxCards)
+                  )
+                }
+                className="w-full accent-emerald-500 disabled:opacity-50"
+              />
+              <input
+                type="number"
+                min={1}
+                max={maxCards}
+                value={count}
+                disabled={!user || authLoading || loading}
+                onChange={(e) => {
+                  const input = Number(e.currentTarget.value) || 1;
+                  setCount(Math.min(Math.max(input, 1), maxCards));
+                }}
+                className="w-20 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm text-zinc-200 disabled:opacity-50"
+              />
+            </div>
+            <p className="mt-2 text-xs text-zinc-500">
+              {billing?.plan === "pro"
+                ? "You can generate up to 50 flashcards per set."
+                : "You can generate up to 10 flashcards per set."}
+            </p>
+            {billing?.plan !== "pro" && count >= 10 ? (
+              <p className="mt-1 text-xs text-emerald-300">
+                Upgrade to Pro to generate up to 50 flashcards at once.
+              </p>
+            ) : null}
+          </div>
           {user ? (
             usageLoading ? (
               <p className="text-xs text-zinc-500">Loading usage...</p>

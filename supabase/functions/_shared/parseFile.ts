@@ -1,5 +1,4 @@
 import { resolvePDFJS } from "https://esm.sh/pdfjs-serverless@0.4.2";
-import Tesseract from "https://cdn.jsdelivr.net/npm/tesseract.js@5/+esm";
 
 function cleanText(text: string): string {
   return text
@@ -9,6 +8,7 @@ function cleanText(text: string): string {
     .trim();
 }
 
+/** PDF text only; images are handled in upload-notes via direct Vision. */
 export async function parseFileToText(
   file: File,
   mimeType?: string
@@ -36,21 +36,7 @@ export async function parseFileToText(
     }
 
     if (type.startsWith("image/")) {
-      try {
-        const result = await Tesseract.recognize(file, "eng", {
-          logger: () => {
-            // Keep edge logs clean for now.
-          },
-        });
-        const text = result?.data?.text || "";
-
-        console.log("OCR length:", text.length);
-
-        return cleanText(text);
-      } catch (err) {
-        console.error("OCR failed:", err);
-        return "";
-      }
+      return "";
     }
 
     console.error("parseFileToText: unsupported type", type);

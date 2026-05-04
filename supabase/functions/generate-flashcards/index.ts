@@ -107,6 +107,15 @@ Deno.serve(async (req) => {
     return json(401, { error: "Unauthorized" });
   }
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("plan")
+    .eq("id", user.id)
+    .single();
+
+  const plan = profile?.plan === "pro" ? "pro" : "free";
+  const MAX_CARDS = plan === "pro" ? 50 : 10;
+
   let rawBody: unknown;
   try {
     rawBody = await req.json();
@@ -121,6 +130,25 @@ Deno.serve(async (req) => {
   const notesField = (rawBody as Record<string, unknown>).notes;
   if (typeof notesField !== "string") {
     return json(400, { error: "Invalid request body" });
+  }
+
+  const countField = (rawBody as Record<string, unknown>).count;
+  const parsedCount =
+    typeof countField === "number" && Number.isFinite(countField)
+      ? Math.floor(countField)
+      : 10;
+  const requestedCount = Math.min(Math.max(parsedCount, 1), MAX_CARDS);
+
+  if (parsedCount > MAX_CARDS) {
+    return json(400, {
+      error:
+        plan === "pro"
+          ? "Max 50 flashcards per generation."
+          : "Free plan allows up to 10 flashcards.",
+      code: "FLASHCARD_LIMIT_EXCEEDED",
+      plan,
+      max_cards: MAX_CARDS,
+    });
   }
 
   const notes = notesField.trim();
@@ -172,7 +200,7 @@ Deno.serve(async (req) => {
           },
           {
             role: "user",
-            content: `Convert the following notes into concise flashcards. Each flashcard should have a clear question and answer.\n\nNotes:\n${notes}`,
+            content: `Generate exactly ${requestedCount} flashcards from the following notes. Each flashcard should have a clear question and answer.\n\nNotes:\n${notes}`,
           },
         ],
         temperature: 0.3,
@@ -203,6 +231,8 @@ Deno.serve(async (req) => {
       return json(502, { error: "Generation service temporarily unavailable" });
     }
 
+    cards = cards.slice(0, MAX_CARDS);
+
     const { error: recordError } = await supabase.rpc("record_usage_event", {
       p_type: "generation",
     });
@@ -211,10 +241,18 @@ Deno.serve(async (req) => {
       return json(500, { error: "Internal server error" });
     }
 
-    return new Response(JSON.stringify({ cards, plan: planAfterReserve }), {
+    return new Response(
+      JSON.stringify({
+        cards,
+        plan: planAfterReserve,
+        requested_count: requestedCount,
+        max_cards: MAX_CARDS,
+      }),
+      {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+      }
+    );
   } catch {
     return json(500, { error: "Internal server error" });
   }
