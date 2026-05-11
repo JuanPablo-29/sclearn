@@ -36,6 +36,33 @@ export default function Home() {
     setCount((prev) => Math.min(Math.max(prev, 1), maxCards));
   }, [maxCards]);
 
+  useEffect(() => {
+    if (!user) return;
+    if (notes.trim().length > 0) return;
+    try {
+      const raw = sessionStorage.getItem("sclearn_draft_v1");
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as {
+        notes?: unknown;
+        countMode?: unknown;
+        count?: unknown;
+      };
+      if (typeof parsed.notes === "string" && parsed.notes.trim().length > 0) {
+        setNotes(parsed.notes);
+      }
+      if (parsed.countMode === "manual" || parsed.countMode === "auto") {
+        setCountMode(parsed.countMode);
+      }
+      if (typeof parsed.count === "number" && Number.isFinite(parsed.count)) {
+        setCount(Math.min(Math.max(Math.floor(parsed.count), 1), maxCards));
+      }
+      sessionStorage.removeItem("sclearn_draft_v1");
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   async function handleGenerate() {
     if (!user) return;
     const trimmed = notes.trim();

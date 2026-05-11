@@ -12,6 +12,9 @@ type UploadInputProps = {
   usageLoading?: boolean;
   onCardsReady: (cards: Flashcard[]) => Promise<void>;
   onRequireUpgrade: () => void;
+  /** Optional: gate upload behind auth (Landing mini-app). */
+  isAuthenticated?: boolean;
+  onRequireAuth?: () => void;
 };
 
 type UploadStatus =
@@ -73,6 +76,8 @@ export function UploadInput({
   usageLoading = false,
   onCardsReady,
   onRequireUpgrade,
+  isAuthenticated = true,
+  onRequireAuth,
 }: UploadInputProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [status, setStatus] = useState<UploadStatus>(null);
@@ -92,6 +97,13 @@ export function UploadInput({
     if (!file) {
       setStatus("error");
       setError("Choose a supported file first (PDF or image).");
+      return;
+    }
+
+    if (!isAuthenticated) {
+      setStatus("error");
+      setError("Create a free account to generate flashcards.");
+      onRequireAuth?.();
       return;
     }
 
