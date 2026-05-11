@@ -6,6 +6,10 @@ type UploadResult = {
 };
 
 type UploadNotesOptions = {
+  /** Exact count (clamped server-side to plan max). Omit when `autoCount` is true. */
+  count?: number;
+  /** Server picks a count from material length, capped by plan (free 10 / pro 50). */
+  autoCount?: boolean;
   onRequestStarted?: () => void;
   onResponseReceived?: () => void;
 };
@@ -21,6 +25,16 @@ export async function uploadNotes(
   const { supabaseUrl, headers } = await getAuthorizedEdgeInvokeHeaders();
   const formData = new FormData();
   formData.append("file", file);
+
+  if (options?.autoCount) {
+    formData.append("autoCount", "true");
+  } else if (
+    options?.count != null &&
+    Number.isFinite(options.count) &&
+    options.count > 0
+  ) {
+    formData.append("count", String(Math.floor(options.count)));
+  }
 
   options?.onRequestStarted?.();
   const res = await fetch(`${supabaseUrl}/functions/v1/upload-notes`, {

@@ -111,7 +111,7 @@ function uploadLimitMessage(plan: string | undefined): string {
   return "You've used your 3 uploads this month. Upgrade to Pro for more access.";
 }
 
-const FLASHCARD_SYSTEM_PROMPT =
+const FLASHCARD_SYSTEM_RULES =
   'You convert study notes into flashcards. Respond with ONLY a valid JSON array of objects. Each object must have exactly two string keys: "question" and "answer". No markdown fences, no commentary, no extra keys.';
 
 /** Base64 for large binaries without stack overflow from spread. */
@@ -156,6 +156,15 @@ Deno.serve(async (req) => {
   if (userError || !user) {
     return json(401, { error: "Unauthorized" });
   }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("plan")
+    .eq("id", user.id)
+    .single();
+
+  const plan = profile?.plan === "pro" ? "pro" : "free";
+  const maxCards = plan === "pro" ? 50 : 10;
 
   const { data: quotaData, error: quotaError } = await supabase.rpc(
     "reserve_upload_slot"
@@ -221,12 +230,39 @@ Deno.serve(async (req) => {
 
   const isImage = effectiveMime.startsWith("image/");
 
+  const countRaw = form.get("count");
+  const autoCountRaw = form.get("autoCount");
+  const countStr =
+    typeof countRaw === "string"
+      ? countRaw.trim()
+      : typeof countRaw === "number" && Number.isFinite(countRaw)
+        ? String(Math.floor(countRaw))
+        : "";
+  const hasExplicitAuto = autoCountRaw === "true";
+  const hasExplicitCount =
+    countStr !== "" && Number.isFinite(Number(countStr));
+  const autoCount = hasExplicitAuto || !hasExplicitCount;
+  let requestedCount = 10;
+  if (!autoCount && hasExplicitCount) {
+    requestedCount = Math.floor(Number(countStr));
+  }
+  const finalCount = Math.min(Math.max(requestedCount, 1), maxCards);
+
+  const systemFlashcardRules = FLASHCARD_SYSTEM_RULES;
+  const systemContent = autoCount
+    ? `${systemFlashcardRules} The array must contain at most ${maxCards} objects; use fewer if the notes are short. Do not pad with low-value or duplicate cards.`
+    : systemFlashcardRules;
+
   let res: Response;
   try {
     if (isImage) {
       const buffer = await fileEntry.arrayBuffer();
       const base64 = uint8ToBase64(new Uint8Array(buffer));
       console.log("Image upload: direct flashcard generation (single OpenAI call)");
+
+      const imageUserText = autoCount
+        ? `From the study material in the image, create flashcards that cover the important concepts. Decide how many distinct cards the material naturally supports (no fixed count), but never more than ${maxCards} flashcards total. Each flashcard should have a clear question and answer. Return JSON only as specified in the system message.`
+        : `Generate exactly ${finalCount} flashcards from the study material in the image. Each flashcard should have a clear question and answer. Return only valid JSON with exactly ${finalCount} items.`;
 
       res = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -239,15 +275,14 @@ Deno.serve(async (req) => {
           messages: [
             {
               role: "system",
-              content: FLASHCARD_SYSTEM_PROMPT,
+              content: systemContent,
             },
             {
               role: "user",
               content: [
                 {
                   type: "text",
-                  text:
-                    "Extract key concepts from this study material and generate flashcards. Return JSON only as specified in the system message.",
+                  text: imageUserText,
                 },
                 {
                   type: "image_url",
@@ -304,6 +339,10 @@ Deno.serve(async (req) => {
       console.log("Final text used for AI:", safeText.slice(0, 300));
       console.log("Word count:", wordCount);
 
+      const pdfUserContent = autoCount
+        ? `From the notes below, create flashcards that cover the important concepts. Decide how many distinct cards the material naturally supports (no fixed count), but never more than ${maxCards} flashcards total. Each flashcard should have a clear question and answer.\n\nNotes:\n${safeText}`
+        : `Generate exactly ${finalCount} flashcards from the following notes. Each flashcard should have a clear question and answer. Return only valid JSON with exactly ${finalCount} items.\n\nNotes:\n${safeText}`;
+
       res = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -315,12 +354,11 @@ Deno.serve(async (req) => {
           messages: [
             {
               role: "system",
-              content: FLASHCARD_SYSTEM_PROMPT,
+              content: systemContent,
             },
             {
               role: "user",
-              content:
-                `Convert the following notes into concise flashcards. Each flashcard should have a clear question and answer.\n\nNotes:\n${safeText}`,
+              content: pdfUserContent,
             },
           ],
           temperature: 0.3,
@@ -350,6 +388,8 @@ Deno.serve(async (req) => {
     if (cards.length === 0) {
       return json(502, { error: "Generation service temporarily unavailable" });
     }
+
+    cards = cards.slice(0, maxCards);
 
     const { error: recordError } = await supabase.rpc("record_usage_event", {
       p_type: "upload",

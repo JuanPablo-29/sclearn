@@ -15,6 +15,10 @@ type UploadInputProps = {
   /** Optional: gate upload behind auth (Landing mini-app). */
   isAuthenticated?: boolean;
   onRequireAuth?: () => void;
+  /** Match pasted-notes generation (defaults: auto, 10 cards max free). */
+  count?: number;
+  countMode?: "auto" | "manual";
+  maxCards?: number;
 };
 
 type UploadStatus =
@@ -78,6 +82,9 @@ export function UploadInput({
   onRequireUpgrade,
   isAuthenticated = true,
   onRequireAuth,
+  count = 10,
+  countMode = "auto",
+  maxCards = 10,
 }: UploadInputProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [status, setStatus] = useState<UploadStatus>(null);
@@ -127,10 +134,18 @@ export function UploadInput({
     trackEvent("upload_started", {
       file_type: effectiveMime,
       file_size: file.size,
+      count_mode: countMode,
     });
+
+    const capped =
+      countMode === "manual"
+        ? Math.min(Math.max(Math.floor(count) || 1, 1), maxCards)
+        : undefined;
 
     try {
       const { cards } = await uploadNotes(file, {
+        autoCount: countMode === "auto",
+        count: countMode === "manual" ? capped : undefined,
         onRequestStarted: () => setStatus("extracting"),
         onResponseReceived: () => setStatus("generating"),
       });
@@ -166,13 +181,22 @@ export function UploadInput({
     }
   }
 
+  const manualCountDisplay = Math.min(
+    Math.max(Math.floor(count) || 1, 1),
+    maxCards
+  );
+  const generatingLabel =
+    countMode === "auto"
+      ? "Generating flashcards..."
+      : `Generating ${manualCountDisplay} flashcards...`;
+
   const statusText =
     status === "uploading"
       ? "Uploading file..."
       : status === "extracting"
         ? "Reading your file..."
         : status === "generating"
-          ? "Generating flashcards..."
+          ? generatingLabel
           : status === "done"
             ? "Flashcards ready!"
             : null;

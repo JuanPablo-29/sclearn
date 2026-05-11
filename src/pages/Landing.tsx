@@ -334,6 +334,9 @@ export default function Landing() {
                     onRequireAuth={requireAuth}
                     onCardsReady={handleUploadedCards}
                     onRequireUpgrade={() => setUpgradeOpen(true)}
+                    count={count}
+                    countMode={countMode}
+                    maxCards={maxCards}
                   />
                 </div>
 

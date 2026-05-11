@@ -397,6 +397,9 @@ export default function Home() {
             usageLoading={usageLoading}
             onCardsReady={handleUploadedCards}
             onRequireUpgrade={() => setUpgradeOpen(true)}
+            count={count}
+            countMode={countMode}
+            maxCards={maxCards}
           />
         </div>
       </main>
