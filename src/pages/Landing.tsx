@@ -26,6 +26,7 @@ export default function Landing() {
   const [error, setError] = useState<string | null>(null);
   const [successCount, setSuccessCount] = useState<number | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const maxCards = billing?.plan === "pro" ? 50 : 10;
 
   const handleStartClick = () => {
@@ -158,23 +159,30 @@ export default function Landing() {
         open={upgradeOpen}
         onClose={() => setUpgradeOpen(false)}
       />
-      <header className="sticky top-0 z-10 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+      <header className="sticky top-0 z-20 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-md">
+        <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-4 px-4 py-3 md:px-6 md:py-4">
           <Link
             to="/"
-            className="inline-flex min-h-[44px] touch-manipulation items-center gap-3 text-lg font-semibold tracking-tight text-zinc-100"
+            className="inline-flex min-h-[44px] min-w-0 touch-manipulation items-center gap-3 text-zinc-100"
+            onClick={() => setMobileMenuOpen(false)}
           >
             <img
               src="/logo.png"
               alt=""
-              width={48}
-              height={48}
-              className="h-12 w-12 shrink-0 object-contain sm:h-14 sm:w-14"
+              width={40}
+              height={40}
+              className="h-10 w-10 shrink-0 object-contain md:h-12 md:w-12"
               decoding="async"
             />
-            <span>Sclearn</span>
+            <span className="whitespace-nowrap text-base font-bold tracking-tight md:text-lg">
+              Sclearn
+            </span>
           </Link>
-          <div className="flex items-center gap-2 sm:gap-3">
+
+          <nav
+            className="hidden items-center gap-3 md:flex"
+            aria-label="Main"
+          >
             <Link
               to="/pricing"
               className="inline-flex min-h-[44px] touch-manipulation items-center rounded-xl px-3 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200"
@@ -190,12 +198,96 @@ export default function Landing() {
             <Link
               to="/learn"
               onClick={handleStartClick}
-              className="inline-flex min-h-[44px] touch-manipulation items-center rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-emerald-400"
+              className="inline-flex min-h-[44px] touch-manipulation items-center rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-emerald-400"
             >
-              Try sample
+              Try Free
             </Link>
+          </nav>
+
+          <div className="flex shrink-0 items-center gap-2 md:hidden">
+            <Link
+              to="/learn"
+              onClick={() => {
+                handleStartClick();
+                setMobileMenuOpen(false);
+              }}
+              className="inline-flex touch-manipulation items-center justify-center whitespace-nowrap rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-emerald-400"
+            >
+              Try Free
+            </Link>
+            <button
+              type="button"
+              className="inline-flex min-h-[44px] min-w-[44px] touch-manipulation items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900/60 text-zinc-200 hover:bg-zinc-800"
+              aria-expanded={mobileMenuOpen}
+              aria-controls="landing-mobile-nav"
+              onClick={() => setMobileMenuOpen((o) => !o)}
+            >
+              <span className="sr-only">
+                {mobileMenuOpen ? "Close menu" : "Open menu"}
+              </span>
+              {mobileMenuOpen ? (
+                <svg
+                  className="size-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth="2"
+                  stroke="currentColor"
+                  aria-hidden
+                >
+                  <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <svg
+                  className="size-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth="2"
+                  stroke="currentColor"
+                  aria-hidden
+                >
+                  <path
+                    d="M4 7h16M4 12h16M4 17h16"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              )}
+            </button>
           </div>
         </div>
+
+        {mobileMenuOpen ? (
+          <div
+            id="landing-mobile-nav"
+            className="border-t border-zinc-800/80 bg-zinc-950/95 md:hidden"
+          >
+            <nav
+              className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-3"
+              aria-label="Mobile"
+            >
+              <Link
+                to="/pricing"
+                className="inline-flex min-h-[44px] touch-manipulation items-center rounded-lg px-2 text-sm font-medium text-zinc-300 hover:bg-zinc-800/80"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Pricing
+              </Link>
+              <Link
+                to="/login"
+                className="inline-flex min-h-[44px] touch-manipulation items-center rounded-lg px-2 text-sm font-medium text-zinc-300 hover:bg-zinc-800/80"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Sign In
+              </Link>
+              <Link
+                to="/app"
+                className="inline-flex min-h-[44px] touch-manipulation items-center rounded-lg px-2 text-sm font-medium text-zinc-400 hover:bg-zinc-800/80 hover:text-zinc-200"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Open app
+              </Link>
+            </nav>
+          </div>
+        ) : null}
       </header>
 
       <main>
