@@ -4,18 +4,28 @@ import { CTA } from "@/components/landing/CTA";
 import { Features } from "@/components/landing/Features";
 import { Footer } from "@/components/landing/Footer";
 import { HowItWorks } from "@/components/landing/HowItWorks";
+import { UpgradeModal } from "@/components/UpgradeModal";
 import { trackEvent } from "@/lib/analytics";
 import { UploadInput } from "@/components/UploadInput";
 import { useAuth } from "@/context/AuthContext";
 import { useUsage } from "@/hooks/useUsage";
+import type { Flashcard } from "@/lib/flashcard";
+import { generateFlashcardsFromNotes } from "@/lib/generateFlashcardsApi";
+import { replaceUserFlashcards } from "@/lib/flashcardsDb";
+import { isQuotaBlockedError } from "@/lib/quotaErrors";
+import { supabase } from "@/lib/supabase";
 
 export default function Landing() {
   const navigate = useNavigate();
   const { user, loading: authLoading, billing } = useAuth();
-  const { usage, loading: usageLoading } = useUsage();
+  const { usage, loading: usageLoading, refreshUsage } = useUsage();
   const [notes, setNotes] = useState("");
   const [count, setCount] = useState(10);
   const [countMode, setCountMode] = useState<"manual" | "auto">("auto");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successCount, setSuccessCount] = useState<number | null>(null);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const maxCards = billing?.plan === "pro" ? 50 : 10;
 
   const handleStartClick = () => {
@@ -25,6 +35,33 @@ export default function Landing() {
   useEffect(() => {
     setCount((prev) => Math.min(Math.max(prev, 1), maxCards));
   }, [maxCards]);
+
+  useEffect(() => {
+    if (!user) return;
+    if (notes.trim().length > 0) return;
+    try {
+      const raw = sessionStorage.getItem("sclearn_draft_v1");
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as {
+        notes?: unknown;
+        countMode?: unknown;
+        count?: unknown;
+      };
+      if (typeof parsed.notes === "string" && parsed.notes.trim().length > 0) {
+        setNotes(parsed.notes);
+      }
+      if (parsed.countMode === "manual" || parsed.countMode === "auto") {
+        setCountMode(parsed.countMode);
+      }
+      if (typeof parsed.count === "number" && Number.isFinite(parsed.count)) {
+        setCount(Math.min(Math.max(Math.floor(parsed.count), 1), maxCards));
+      }
+      sessionStorage.removeItem("sclearn_draft_v1");
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   function saveDraft() {
     try {
@@ -43,18 +80,84 @@ export default function Landing() {
     navigate("/register");
   }
 
-  function handleGenerateClick() {
+  const isGenerationBlocked = Boolean(
+    user && usage && usage.generations.remaining <= 0
+  );
+  const canGenerate =
+    Boolean(user) &&
+    notes.trim().length > 0 &&
+    !loading &&
+    !authLoading &&
+    !isGenerationBlocked;
+
+  async function handleGenerateClick() {
     if (!user) {
       saveDraft();
       trackEvent("generate_clicked_logged_out");
       navigate("/register");
       return;
     }
-    navigate("/app");
+    const trimmed = notes.trim();
+    if (!trimmed) return;
+    setError(null);
+    setSuccessCount(null);
+    setLoading(true);
+    try {
+      const cards = await generateFlashcardsFromNotes(
+        trimmed,
+        countMode === "auto"
+          ? { autoCount: true }
+          : { count: Math.min(count, maxCards) }
+      );
+      if (cards.length === 0) {
+        throw new Error("No flashcards returned");
+      }
+      await replaceUserFlashcards(supabase, user.id, cards);
+      trackEvent("flashcards_generated", {
+        card_count: cards.length,
+        count_mode: countMode,
+        source: "landing",
+      });
+      setSuccessCount(cards.length);
+      await refreshUsage();
+    } catch (e) {
+      if (isQuotaBlockedError(e) && e.quotaKind === "generation") {
+        if (e.plan === "free") {
+          setUpgradeOpen(true);
+          setError(null);
+        } else {
+          setError(e.message);
+        }
+      } else {
+        setError(
+          e instanceof Error ? e.message : "Failed to generate flashcards"
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleUploadedCards(cards: Flashcard[]) {
+    if (!user) {
+      throw new Error("Sign in to upload notes.");
+    }
+    await replaceUserFlashcards(supabase, user.id, cards);
+    trackEvent("upload_succeeded", {
+      card_count: cards.length,
+      source: "landing",
+    });
+    setSuccessCount(cards.length);
+    setError(null);
+    await refreshUsage();
   }
 
   return (
     <div className="min-h-[100dvh] bg-zinc-950 text-zinc-100">
+      <UpgradeModal
+        open={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+      />
       <header className="sticky top-0 z-10 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link
@@ -132,15 +235,13 @@ export default function Landing() {
 
                 <div className="mt-3">
                   <UploadInput
-                    disabled={authLoading}
+                    disabled={authLoading || loading}
                     usage={usage}
                     usageLoading={usageLoading}
                     isAuthenticated={Boolean(user)}
                     onRequireAuth={requireAuth}
-                    onCardsReady={async () => {
-                      navigate("/app");
-                    }}
-                    onRequireUpgrade={() => navigate("/pricing")}
+                    onCardsReady={handleUploadedCards}
+                    onRequireUpgrade={() => setUpgradeOpen(true)}
                   />
                 </div>
 
@@ -154,6 +255,7 @@ export default function Landing() {
                         type="radio"
                         name="landing-count-mode"
                         checked={countMode === "auto"}
+                        disabled={loading}
                         onChange={() => setCountMode("auto")}
                         className="accent-emerald-500"
                       />
@@ -164,6 +266,7 @@ export default function Landing() {
                         type="radio"
                         name="landing-count-mode"
                         checked={countMode === "manual"}
+                        disabled={loading}
                         onChange={() => setCountMode("manual")}
                         className="accent-emerald-500"
                       />
@@ -179,6 +282,7 @@ export default function Landing() {
                         max={maxCards}
                         step={1}
                         value={count}
+                        disabled={loading}
                         onChange={(e) =>
                           setCount(
                             Math.min(
@@ -194,6 +298,7 @@ export default function Landing() {
                         min={1}
                         max={maxCards}
                         value={count}
+                        disabled={loading}
                         onChange={(e) => {
                           const input = Number(e.currentTarget.value) || 1;
                           setCount(Math.min(Math.max(input, 1), maxCards));
@@ -216,14 +321,30 @@ export default function Landing() {
 
                 <button
                   type="button"
-                  onClick={handleGenerateClick}
-                  className="mt-3 inline-flex min-h-[44px] w-full touch-manipulation items-center justify-center rounded-xl bg-emerald-500 px-6 py-3 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400"
+                  disabled={!canGenerate}
+                  onClick={() => void handleGenerateClick()}
+                  className="mt-3 inline-flex min-h-[44px] w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-emerald-500 px-6 py-3 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Generate Flashcards
+                  {loading ? (
+                    <>
+                      <span
+                        className="size-4 animate-spin rounded-full border-2 border-zinc-950/30 border-t-zinc-950"
+                        aria-hidden
+                      />
+                      Generating…
+                    </>
+                  ) : (
+                    "Generate Flashcards"
+                  )}
                 </button>
+                {user && isGenerationBlocked ? (
+                  <p className="mt-2 text-center text-xs text-red-400">
+                    Daily generation limit reached. Upgrade to continue.
+                  </p>
+                ) : null}
                 <p className="mt-2 text-center text-xs text-zinc-500">
                   {user
-                    ? "You're signed in — generate anytime."
+                    ? "Signed in — flashcards save to your account."
                     : "Free account required to generate flashcards."}
                 </p>
                 {!user ? (
@@ -231,6 +352,32 @@ export default function Landing() {
                     <span className="font-medium text-zinc-200">
                       Create a free account to generate flashcards.
                     </span>
+                  </p>
+                ) : null}
+
+                {successCount !== null ? (
+                  <div className="mt-3 rounded-xl border border-emerald-900/40 bg-emerald-950/20 px-4 py-3 text-sm text-emerald-100">
+                    <p className="font-medium">{successCount} flashcards ready</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Link
+                        to="/learn"
+                        className="inline-flex min-h-[40px] items-center justify-center rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500"
+                      >
+                        Study now
+                      </Link>
+                      <Link
+                        to="/app"
+                        className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-emerald-800/60 px-3 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-950/40"
+                      >
+                        Open full app
+                      </Link>
+                    </div>
+                  </div>
+                ) : null}
+
+                {error ? (
+                  <p className="mt-3 text-sm text-red-400" role="alert">
+                    {error}
                   </p>
                 ) : null}
               </div>
