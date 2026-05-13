@@ -10,24 +10,23 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setMessage(null);
     setSubmitting(true);
-    const { error: err } = await signUp(email, password);
+    const { error: err, session } = await signUp(email, password);
     setSubmitting(false);
     if (err) {
       setError(err.message);
       return;
     }
     trackEvent("user_signed_up");
-    setMessage(
-      "Check your email to confirm your account if required, then sign in."
-    );
-    navigate("/login");
+    if (session) {
+      navigate("/app");
+      return;
+    }
+    navigate(`/verify-email?email=${encodeURIComponent(email.trim())}`);
   }
 
   return (
@@ -65,11 +64,6 @@ export default function Register() {
           {error ? (
             <p className="text-sm text-red-400" role="alert">
               {error}
-            </p>
-          ) : null}
-          {message ? (
-            <p className="text-sm text-emerald-400" role="status">
-              {message}
             </p>
           ) : null}
           <button

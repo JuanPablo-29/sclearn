@@ -26,7 +26,11 @@ type AuthContextValue = {
   billingLoading: boolean;
   refreshBilling: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (
+    email: string,
+    password: string
+  ) => Promise<{ error: Error | null; session: Session | null }>;
+  resendSignupEmail: (email: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 };
 
@@ -133,9 +137,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signUp(email: string, password: string) {
     const redirectTo = `${getSiteUrl()}/learn`;
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: redirectTo,
+      },
+    });
+    return {
+      error: error ? new Error(error.message) : null,
+      session: data.session ?? null,
+    };
+  }
+
+  async function resendSignupEmail(email: string) {
+    const redirectTo = `${getSiteUrl()}/learn`;
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: email.trim(),
       options: {
         emailRedirectTo: redirectTo,
       },
@@ -158,6 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshBilling,
     signIn,
     signUp,
+    resendSignupEmail,
     signOut,
   };
 

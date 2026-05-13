@@ -15,6 +15,7 @@ import Referrals from "@/pages/Referrals";
 import Register from "@/pages/Register";
 import SharedDeck from "@/pages/SharedDeck";
 import Terms from "@/pages/Terms";
+import VerifyEmail from "@/pages/VerifyEmail";
 
 export default function App() {
   useEffect(() => {
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="/deck/:slug" element={<SharedDeck />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/pricing" element={<Pricing />} />

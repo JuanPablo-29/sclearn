@@ -1,28 +1,53 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { mapSignInError } from "@/lib/authErrors";
 import { trackEvent } from "@/lib/analytics";
 
 export default function Login() {
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { signIn, resendSignupEmail } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [needsVerification, setNeedsVerification] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [resendError, setResendError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setNeedsVerification(false);
+    setResendMessage(null);
+    setResendError(null);
     setSubmitting(true);
     const { error: err } = await signIn(email, password);
     setSubmitting(false);
     if (err) {
-      setError(err.message);
+      const { displayMessage, needsEmailVerification } = mapSignInError(err);
+      setError(displayMessage);
+      setNeedsVerification(needsEmailVerification);
       return;
     }
     trackEvent("user_logged_in");
     navigate("/app");
+  }
+
+  async function handleResendVerification() {
+    const trimmed = email.trim();
+    if (!trimmed) return;
+    setResendMessage(null);
+    setResendError(null);
+    setResending(true);
+    const { error: err } = await resendSignupEmail(trimmed);
+    setResending(false);
+    if (err) {
+      setResendError(err.message || "Could not resend the email.");
+      return;
+    }
+    setResendMessage("Verification email sent.");
   }
 
   return (
@@ -41,7 +66,11 @@ export default function Login() {
               autoComplete="email"
               required
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setResendMessage(null);
+                setResendError(null);
+              }}
               className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-base text-zinc-100 focus:border-emerald-600/60 focus:outline-none focus:ring-2 focus:ring-emerald-600/30"
             />
           </label>
@@ -57,8 +86,36 @@ export default function Login() {
             />
           </label>
           {error ? (
+            <div className="rounded-lg border border-red-900/40 bg-red-950/30 px-3 py-3" role="alert">
+              <p className="text-sm text-red-300">{error}</p>
+              {needsVerification ? (
+                <div className="mt-3 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    disabled={resending || !email.trim()}
+                    onClick={() => void handleResendVerification()}
+                    className="inline-flex min-h-[40px] touch-manipulation items-center justify-center rounded-lg border border-emerald-700/50 bg-emerald-600/15 px-3 py-2 text-sm font-semibold text-emerald-100 hover:bg-emerald-600/25 disabled:opacity-50"
+                  >
+                    {resending ? "Sending…" : "Resend verification email"}
+                  </button>
+                  <Link
+                    to={`/verify-email?email=${encodeURIComponent(email.trim())}`}
+                    className="text-center text-sm text-emerald-400/90 hover:text-emerald-300"
+                  >
+                    Open verification help screen
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {resendMessage ? (
+            <p className="text-sm text-emerald-400" role="status">
+              {resendMessage}
+            </p>
+          ) : null}
+          {resendError ? (
             <p className="text-sm text-red-400" role="alert">
-              {error}
+              {resendError}
             </p>
           ) : null}
           <button
