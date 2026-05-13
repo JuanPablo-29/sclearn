@@ -84,12 +84,6 @@ export default function Landing() {
   const isGenerationBlocked = Boolean(
     user && usage && usage.generations.remaining <= 0
   );
-  const canGenerate =
-    Boolean(user) &&
-    notes.trim().length > 0 &&
-    !loading &&
-    !authLoading &&
-    !isGenerationBlocked;
 
   async function handleGenerateClick() {
     if (!user) {
@@ -99,7 +93,15 @@ export default function Landing() {
       return;
     }
     const trimmed = notes.trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      setError("Paste your notes above or upload a file to generate flashcards.");
+      return;
+    }
+    if (isGenerationBlocked) {
+      setUpgradeOpen(true);
+      setError(null);
+      return;
+    }
     setError(null);
     setSuccessCount(null);
     setLoading(true);
@@ -416,9 +418,9 @@ export default function Landing() {
 
                 <button
                   type="button"
-                  disabled={!canGenerate}
+                  disabled={loading}
                   onClick={() => void handleGenerateClick()}
-                  className="mt-3 inline-flex min-h-[44px] w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-emerald-500 px-6 py-3 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="mt-3 inline-flex min-h-[44px] w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-emerald-500 px-6 py-3 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 active:scale-[0.99] active:bg-emerald-500 disabled:cursor-wait disabled:opacity-90"
                 >
                   {loading ? (
                     <>
@@ -433,20 +435,19 @@ export default function Landing() {
                   )}
                 </button>
                 {user && isGenerationBlocked ? (
-                  <p className="mt-2 text-center text-xs text-red-400">
-                    Daily generation limit reached. Upgrade to continue.
+                  <p className="mt-2 text-center text-xs text-amber-400/90">
+                    Daily generation limit reached. Tap Generate to upgrade and
+                    continue.
                   </p>
                 ) : null}
                 <p className="mt-2 text-center text-xs text-zinc-500">
                   {user
                     ? "Signed in — flashcards save to your account."
-                    : "Free account required to generate flashcards."}
+                    : "Your notes will be saved after signup."}
                 </p>
                 {!user ? (
-                  <p className="mt-1 text-center text-xs text-zinc-400">
-                    <span className="font-medium text-zinc-200">
-                      Create a free account to generate flashcards.
-                    </span>
+                  <p className="mt-1 text-center text-xs text-zinc-500">
+                    Free signup takes less than 10 seconds.
                   </p>
                 ) : null}
 
