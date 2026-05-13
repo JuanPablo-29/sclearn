@@ -1,4 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import {
+  FREE_MAX_FLASHCARDS_PER_RUN,
+  maxFlashcardsForPlan,
+} from "../_shared/flashcardLimits.ts";
+import {
+  FLASHCARD_EDUCATION_RULES,
+  FLASHCARD_JSON_OUTPUT_RULE,
+  notesDensityHint,
+} from "../_shared/flashcardGenerationGuide.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -114,7 +123,7 @@ Deno.serve(async (req) => {
     .single();
 
   const plan = profile?.plan === "pro" ? "pro" : "free";
-  const MAX_CARDS = plan === "pro" ? 50 : 10;
+  const MAX_CARDS = maxFlashcardsForPlan(plan);
 
   let rawBody: unknown;
   try {
@@ -148,14 +157,14 @@ Deno.serve(async (req) => {
     const parsedCount =
       typeof countField === "number" && Number.isFinite(countField)
         ? Math.floor(countField)
-        : 10;
+        : FREE_MAX_FLASHCARDS_PER_RUN;
 
     if (parsedCount > MAX_CARDS) {
       return json(400, {
         error:
           plan === "pro"
             ? "Max 50 flashcards per generation."
-            : "Free plan allows up to 10 flashcards.",
+            : `Free plan allows up to ${FREE_MAX_FLASHCARDS_PER_RUN} flashcards.`,
         code: "FLASHCARD_LIMIT_EXCEEDED",
         plan,
         max_cards: MAX_CARDS,
@@ -188,16 +197,17 @@ Deno.serve(async (req) => {
   const planAfterReserve =
     typeof quota.plan === "string" ? quota.plan : "free";
 
-  const systemFlashcardRules =
-    'You convert study notes into flashcards. Respond with ONLY a valid JSON array of objects. Each object must have exactly two string keys: "question" and "answer". No markdown fences, no commentary, no extra keys.';
+  const systemBase = `${FLASHCARD_EDUCATION_RULES}\n\n${FLASHCARD_JSON_OUTPUT_RULE}`;
 
   const systemContent = autoCount
-    ? `${systemFlashcardRules} The array must contain at most ${MAX_CARDS} objects; use fewer if the notes are short. Do not pad with low-value or duplicate cards.`
-    : systemFlashcardRules;
+    ? `${systemBase} The JSON array must contain at most ${MAX_CARDS} objects. For substantial or dense notes, produce many distinct cards when the material supports them, but never exceed ${MAX_CARDS}. For very short notes, use fewer. Do not pad with low-value or duplicate cards.`
+    : systemBase;
+
+  const density = autoCount ? notesDensityHint(notes, MAX_CARDS) : "";
 
   const userContent = autoCount
-    ? `From the notes below, create flashcards that cover the important concepts. Decide how many distinct cards the material naturally supports (no fixed count), but never more than ${MAX_CARDS} flashcards total. Each flashcard should have a clear question and answer.\n\nNotes:\n${notes}`
-    : `Generate exactly ${manualRequestedCount} flashcards from the following notes. Each flashcard should have a clear question and answer.\n\nNotes:\n${notes}`;
+    ? `From the notes below, create flashcards that cover major ideas and important details. Decide how many distinct cards the material supports (no fixed count), but never more than ${MAX_CARDS} flashcards total. Each flashcard must have a clear question and answer.${density}\n\nNotes:\n${notes}`
+    : `Generate exactly ${manualRequestedCount} flashcards from the following notes. Each flashcard must have a clear question and answer. Return valid JSON with exactly ${manualRequestedCount} items.\n\nNotes:\n${notes}`;
 
   try {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -219,7 +229,7 @@ Deno.serve(async (req) => {
           },
         ],
         temperature: 0.3,
-        max_tokens: 4096,
+        max_tokens: 8192,
       }),
     });
 

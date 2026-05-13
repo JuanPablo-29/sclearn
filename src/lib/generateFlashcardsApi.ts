@@ -4,6 +4,7 @@ import {
   QuotaBlockedError,
   type BillingPlan,
 } from "@/lib/quotaErrors";
+import { FREE_MAX_FLASHCARDS_PER_RUN } from "@/lib/flashcardLimits";
 import { getAuthorizedEdgeInvokeHeaders } from "@/lib/supabaseEdgeAuth";
 
 type InvokeSuccess = { cards: Flashcard[] };
@@ -21,7 +22,7 @@ function parseErrorMessage(text: string, result: unknown): string {
 export type GenerateFlashcardsOptions = {
   /** Exact count (clamped server-side to plan max). Ignored when `autoCount` is true. */
   count?: number;
-  /** Server picks a count from note length, capped by plan (free 10 / pro 50). */
+  /** Server picks a count from note length, capped by plan (free 20 / pro 50). */
   autoCount?: boolean;
 };
 
@@ -31,7 +32,7 @@ export type GenerateFlashcardsOptions = {
  */
 export async function generateFlashcardsFromNotes(
   notes: string,
-  options: number | GenerateFlashcardsOptions = 10
+  options: number | GenerateFlashcardsOptions = FREE_MAX_FLASHCARDS_PER_RUN
 ): Promise<Flashcard[]> {
   const { supabaseUrl, headers } = await getAuthorizedEdgeInvokeHeaders();
   const url = `${supabaseUrl}/functions/v1/generate-flashcards`;
@@ -42,7 +43,7 @@ export async function generateFlashcardsFromNotes(
   } else if (options?.autoCount) {
     body = { notes, auto_count: true };
   } else {
-    body = { notes, count: options?.count ?? 10 };
+    body = { notes, count: options?.count ?? FREE_MAX_FLASHCARDS_PER_RUN };
   }
 
   const response = await globalThis.fetch(url, {

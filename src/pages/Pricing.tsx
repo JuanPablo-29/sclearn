@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { trackEvent } from "@/lib/analytics";
 import { createCheckoutSessionUrl } from "@/lib/billing";
+import { FREE_MAX_FLASHCARDS_PER_RUN, PRO_MAX_FLASHCARDS_PER_RUN } from "@/lib/flashcardLimits";
 import { useAuth } from "@/context/AuthContext";
 
 const freeFeatures = [
-  "Generate up to 10 flashcards per set",
+  `Generate up to ${FREE_MAX_FLASHCARDS_PER_RUN} flashcards per set`,
   "Limited daily generations",
   "3 uploads per month",
   "Save up to 3 decks",
@@ -14,7 +15,7 @@ const freeFeatures = [
 ];
 
 const proFeatures = [
-  "Generate up to 50 flashcards per set",
+  `Generate up to ${PRO_MAX_FLASHCARDS_PER_RUN} flashcards per set`,
   "Unlimited generations",
   "100 uploads per month",
   "Save up to 10 decks",

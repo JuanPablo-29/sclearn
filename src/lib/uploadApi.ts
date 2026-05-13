@@ -8,7 +8,7 @@ type UploadResult = {
 type UploadNotesOptions = {
   /** Exact count (clamped server-side to plan max). Omit when `autoCount` is true. */
   count?: number;
-  /** Server picks a count from material length, capped by plan (free 10 / pro 50). */
+  /** Server picks a count from material length, capped by plan (free 20 / pro 50). */
   autoCount?: boolean;
   onRequestStarted?: () => void;
   onResponseReceived?: () => void;

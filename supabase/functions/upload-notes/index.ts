@@ -1,5 +1,16 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { parseFileToText } from "../_shared/parseFile.ts";
+import {
+  FREE_MAX_FLASHCARDS_PER_RUN,
+  maxFlashcardsForPlan,
+} from "../_shared/flashcardLimits.ts";
+import {
+  FLASHCARD_EDUCATION_RULES,
+  FLASHCARD_JSON_OUTPUT_RULE,
+  imageDensityHint,
+  notesDensityHint,
+  UPLOAD_SOURCE_ANALYSIS_RULES,
+} from "../_shared/flashcardGenerationGuide.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -111,9 +122,6 @@ function uploadLimitMessage(plan: string | undefined): string {
   return "You've used your 3 uploads this month. Upgrade to Pro for more access.";
 }
 
-const FLASHCARD_SYSTEM_RULES =
-  'You convert study notes into flashcards. Respond with ONLY a valid JSON array of objects. Each object must have exactly two string keys: "question" and "answer". No markdown fences, no commentary, no extra keys.';
-
 /** Base64 for large binaries without stack overflow from spread. */
 function uint8ToBase64(bytes: Uint8Array): string {
   const CHUNK = 0x8000;
@@ -164,7 +172,7 @@ Deno.serve(async (req) => {
     .single();
 
   const plan = profile?.plan === "pro" ? "pro" : "free";
-  const maxCards = plan === "pro" ? 50 : 10;
+  const maxCards = maxFlashcardsForPlan(plan);
 
   const { data: quotaData, error: quotaError } = await supabase.rpc(
     "reserve_upload_slot"
@@ -242,16 +250,16 @@ Deno.serve(async (req) => {
   const hasExplicitCount =
     countStr !== "" && Number.isFinite(Number(countStr));
   const autoCount = hasExplicitAuto || !hasExplicitCount;
-  let requestedCount = 10;
+  let requestedCount = FREE_MAX_FLASHCARDS_PER_RUN;
   if (!autoCount && hasExplicitCount) {
     requestedCount = Math.floor(Number(countStr));
   }
   const finalCount = Math.min(Math.max(requestedCount, 1), maxCards);
 
-  const systemFlashcardRules = FLASHCARD_SYSTEM_RULES;
+  const systemBase = `${FLASHCARD_EDUCATION_RULES}\n\n${FLASHCARD_JSON_OUTPUT_RULE}`;
   const systemContent = autoCount
-    ? `${systemFlashcardRules} The array must contain at most ${maxCards} objects; use fewer if the notes are short. Do not pad with low-value or duplicate cards.`
-    : systemFlashcardRules;
+    ? `${systemBase} The JSON array must contain at most ${maxCards} objects. For dense pages or long extracted notes, produce many distinct cards when warranted, but never exceed ${maxCards}. For very short material, use fewer. Do not pad with low-value or duplicate cards.`
+    : systemBase;
 
   let res: Response;
   try {
@@ -261,8 +269,8 @@ Deno.serve(async (req) => {
       console.log("Image upload: direct flashcard generation (single OpenAI call)");
 
       const imageUserText = autoCount
-        ? `From the study material in the image, create flashcards that cover the important concepts. Decide how many distinct cards the material naturally supports (no fixed count), but never more than ${maxCards} flashcards total. Each flashcard should have a clear question and answer. Return JSON only as specified in the system message.`
-        : `Generate exactly ${finalCount} flashcards from the study material in the image. Each flashcard should have a clear question and answer. Return only valid JSON with exactly ${finalCount} items.`;
+        ? `${UPLOAD_SOURCE_ANALYSIS_RULES}\n\nFrom the study material in the image, create flashcards covering headings, bullets, objectives, vocabulary, and readable labels. Decide how many distinct cards the material supports (no fixed count), but never more than ${maxCards} flashcards total. Each flashcard must have a clear question and answer. Return JSON only as specified in the system message.${imageDensityHint(maxCards)}`
+        : `${UPLOAD_SOURCE_ANALYSIS_RULES}\n\nGenerate exactly ${finalCount} flashcards from the study material in the image. Each flashcard must have a clear question and answer. Return only valid JSON with exactly ${finalCount} items.`;
 
       res = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -295,7 +303,7 @@ Deno.serve(async (req) => {
             },
           ],
           temperature: 0.3,
-          max_tokens: 4096,
+          max_tokens: 8192,
         }),
       });
     } else {
@@ -339,9 +347,11 @@ Deno.serve(async (req) => {
       console.log("Final text used for AI:", safeText.slice(0, 300));
       console.log("Word count:", wordCount);
 
+      const pdfDensity = autoCount ? notesDensityHint(safeText, maxCards) : "";
+
       const pdfUserContent = autoCount
-        ? `From the notes below, create flashcards that cover the important concepts. Decide how many distinct cards the material naturally supports (no fixed count), but never more than ${maxCards} flashcards total. Each flashcard should have a clear question and answer.\n\nNotes:\n${safeText}`
-        : `Generate exactly ${finalCount} flashcards from the following notes. Each flashcard should have a clear question and answer. Return only valid JSON with exactly ${finalCount} items.\n\nNotes:\n${safeText}`;
+        ? `${UPLOAD_SOURCE_ANALYSIS_RULES}\n\nFrom the notes below, create flashcards covering major ideas and granular details (headings, bullets, objectives, vocabulary). Decide how many distinct cards the material supports (no fixed count), but never more than ${maxCards} flashcards total. Each flashcard must have a clear question and answer.${pdfDensity}\n\nNotes:\n${safeText}`
+        : `${UPLOAD_SOURCE_ANALYSIS_RULES}\n\nGenerate exactly ${finalCount} flashcards from the following notes. Each flashcard must have a clear question and answer. Return only valid JSON with exactly ${finalCount} items.\n\nNotes:\n${safeText}`;
 
       res = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -362,7 +372,7 @@ Deno.serve(async (req) => {
             },
           ],
           temperature: 0.3,
-          max_tokens: 4096,
+          max_tokens: 8192,
         }),
       });
     }

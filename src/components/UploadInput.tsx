@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { trackEvent } from "@/lib/analytics";
+import { FREE_MAX_FLASHCARDS_PER_RUN } from "@/lib/flashcardLimits";
 import type { Flashcard } from "@/lib/flashcard";
 import { isQuotaBlockedError } from "@/lib/quotaErrors";
 import { uploadNotes } from "@/lib/uploadApi";
@@ -15,7 +16,7 @@ type UploadInputProps = {
   /** Optional: gate upload behind auth (Landing mini-app). */
   isAuthenticated?: boolean;
   onRequireAuth?: () => void;
-  /** Match pasted-notes generation (defaults: auto, 10 cards max free). */
+  /** Match pasted-notes generation (defaults: auto, free-tier max when unset). */
   count?: number;
   countMode?: "auto" | "manual";
   maxCards?: number;
@@ -82,9 +83,9 @@ export function UploadInput({
   onRequireUpgrade,
   isAuthenticated = true,
   onRequireAuth,
-  count = 10,
+  count = FREE_MAX_FLASHCARDS_PER_RUN,
   countMode = "auto",
-  maxCards = 10,
+  maxCards = FREE_MAX_FLASHCARDS_PER_RUN,
 }: UploadInputProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [status, setStatus] = useState<UploadStatus>(null);

@@ -11,6 +11,7 @@ import { trackEvent } from "@/lib/analytics";
 import { deckLimitForPlan } from "@/lib/decks";
 import { replaceUserFlashcards } from "@/lib/flashcardsDb";
 import type { Flashcard } from "@/lib/flashcard";
+import { maxFlashcardsPerRun } from "@/lib/flashcardLimits";
 import { generateFlashcardsFromNotes } from "@/lib/generateFlashcardsApi";
 import { isQuotaBlockedError } from "@/lib/quotaErrors";
 import { supabase } from "@/lib/supabase";
@@ -22,7 +23,7 @@ export default function Home() {
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [count, setCount] = useState(10);
+  const [count, setCount] = useState(20);
   const [countMode, setCountMode] = useState<"manual" | "auto">("auto");
   const [lastGeneratedCards, setLastGeneratedCards] = useState<
     Flashcard[] | null
@@ -30,7 +31,7 @@ export default function Home() {
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const deckCap = deckLimitForPlan(billing?.plan);
-  const maxCards = billing?.plan === "pro" ? 50 : 10;
+  const maxCards = maxFlashcardsPerRun(billing?.plan);
 
   useEffect(() => {
     setCount((prev) => Math.min(Math.max(prev, 1), maxCards));
@@ -241,7 +242,9 @@ export default function Home() {
         {lastGeneratedCards && lastGeneratedCards.length > 0 ? (
           <div className="mb-6 rounded-xl border border-emerald-900/40 bg-emerald-950/20 px-4 py-4 sm:px-5">
             <p className="text-sm font-medium text-emerald-200/95">
-              {lastGeneratedCards.length} flashcards ready
+              {countMode === "auto"
+                ? `Generated ${lastGeneratedCards.length} flashcards`
+                : `${lastGeneratedCards.length} flashcards ready`}
             </p>
             <p className="mt-1 text-xs text-zinc-500">
               Study now and save later from the study screen, or save this run
@@ -378,7 +381,7 @@ export default function Home() {
             <p className="mt-2 text-xs text-zinc-500">
               {billing?.plan === "pro"
                 ? "You can generate up to 50 flashcards per set."
-                : "You can generate up to 10 flashcards per set."}
+                : "You can generate up to 20 flashcards per set."}
             </p>
             {billing?.plan !== "pro" &&
             countMode === "manual" &&
@@ -428,7 +431,7 @@ export default function Home() {
             <p className="text-xs text-zinc-500">
               {billing?.plan === "pro"
                 ? "Up to 50 cards per set"
-                : "Free plan: up to 10 cards per set"}
+                : "Free plan: up to 20 cards per set"}
             </p>
             {isGenerationBlocked ? (
               <p className="text-xs text-red-400">
