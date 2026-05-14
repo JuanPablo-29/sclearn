@@ -1,10 +1,8 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { trackEvent } from "@/lib/analytics";
 
 export default function Register() {
-  const navigate = useNavigate();
   const { signUp } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,18 +13,12 @@ export default function Register() {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
-    const { error: err, session } = await signUp(email, password);
+    const { error: err } = await signUp(email, password);
     setSubmitting(false);
     if (err) {
       setError(err.message);
       return;
     }
-    trackEvent("user_signed_up");
-    if (session) {
-      navigate("/app");
-      return;
-    }
-    navigate(`/verify-email?email=${encodeURIComponent(email.trim())}`);
   }
 
   return (

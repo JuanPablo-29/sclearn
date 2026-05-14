@@ -10,6 +10,7 @@ import {
   useMemo,
   type ReactNode,
 } from "react";
+import { useNavigate } from "react-router-dom";
 import { identifyUser, resetAnalytics, trackEvent } from "@/lib/analytics";
 import {
   fetchUserBillingProfile,
@@ -26,6 +27,7 @@ type AuthContextValue = {
   billingLoading: boolean;
   refreshBilling: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  /** On success: redirects to `/app` when Supabase returns a session, otherwise to `/verify-email?email=…` (email confirmation). */
   signUp: (
     email: string,
     password: string
@@ -37,6 +39,7 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [billing, setBilling] = useState<UserBillingProfile | null>(null);
@@ -136,18 +139,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signUp(email: string, password: string) {
+    const trimmedEmail = email.trim();
     const redirectTo = `${getSiteUrl()}/learn`;
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: trimmedEmail,
       password,
       options: {
         emailRedirectTo: redirectTo,
       },
     });
-    return {
-      error: error ? new Error(error.message) : null,
-      session: data.session ?? null,
-    };
+    if (error) {
+      return {
+        error: new Error(error.message),
+        session: null,
+      };
+    }
+
+    const nextSession = data.session ?? null;
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console -- intentional dev-only signup diagnostics
+      console.log("Signup session:", nextSession);
+    }
+
+    trackEvent("user_signed_up");
+    if (nextSession) {
+      navigate("/app", { replace: true });
+    } else {
+      navigate(
+        `/verify-email?email=${encodeURIComponent(trimmedEmail)}`,
+        { replace: true }
+      );
+    }
+
+    return { error: null, session: nextSession };
   }
 
   async function resendSignupEmail(email: string) {

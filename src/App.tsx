@@ -23,8 +23,8 @@ export default function App() {
   }, []);
 
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/app" element={<Home />} />
@@ -41,7 +41,7 @@ export default function App() {
           <Route path="/admin/referrals" element={<AdminReferrals />} />
           <Route path="/referrals" element={<Referrals />} />
         </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
